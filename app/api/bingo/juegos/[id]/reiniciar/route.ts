@@ -9,7 +9,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json();
   const email = String(body.email ?? "").trim().toLowerCase();
 
-  const j = getJuego(id);
+  const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
   if (email !== j.lider) return NextResponse.json({ error: "Solo el líder puede reiniciar" }, { status: 403 });
 
@@ -24,6 +24,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   j.startedAt = null;
   j.endedAt = null;
   // Los jugadores se mantienen pero sus cartones se borran → deben re-elegir.
-  setJuego(j);
+  await setJuego(j);
   return NextResponse.json({ ok: true });
 }

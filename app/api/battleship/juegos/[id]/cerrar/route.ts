@@ -9,7 +9,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const body = await req.json();
   const email = String(body.email ?? "").trim().toLowerCase();
-  const j = getJuego(id);
+  const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
   if (email !== j.lider) return NextResponse.json({ error: "Solo el líder" }, { status: 403 });
   if (j.estado !== "en_ronda") {
@@ -156,10 +156,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     j.barcos.length > 0 && j.hundidos.length === j.barcos.length;
 
   j.estado = "revelando";
-  setJuego(j);
+  await setJuego(j);
 
-  setTimeout(() => {
-    const fresco = getJuego(id);
+  setTimeout(async () => {
+    const fresco = await getJuego(id);
     if (!fresco) return;
     if (fresco.estado !== "revelando" || fresco.rondaActual !== ronda) return;
     if (todosBarcosHundidos) {
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       fresco.estado = "en_ronda";
       fresco.rondaActual = ronda + 1;
     }
-    setJuego(fresco);
+    await setJuego(fresco);
   }, 5000);
 
   return NextResponse.json({ ok: true, todosBarcosHundidos });

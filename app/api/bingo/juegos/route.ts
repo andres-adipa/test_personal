@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const PATRONES_VALIDOS: Patron[] = ["terna", "linea", "carton_lleno", "dos_cartones_llenos"];
 
 export async function GET() {
-  const juegos = listarJuegos().map((j) => ({
+  const juegos = (await listarJuegos()).map((j) => ({
     id: j.id,
     titulo: j.titulo,
     lider: j.lider,
@@ -75,6 +75,6 @@ export async function POST(req: NextRequest) {
     startedAt: null,
     endedAt: null,
   };
-  setJuego(juego);
+  await setJuego(juego);
   return NextResponse.json({ id });
 }

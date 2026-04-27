@@ -8,7 +8,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json();
   const email = String(body.email ?? "").trim().toLowerCase();
 
-  const j = getJuego(id);
+  const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
   if (email !== j.lider) return NextResponse.json({ error: "Solo el líder puede iniciar" }, { status: 403 });
   if (j.estado === "en_curso") return NextResponse.json({ ok: true });
@@ -29,6 +29,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   j.estado = "en_curso";
   j.startedAt = Date.now();
-  setJuego(j);
+  await setJuego(j);
   return NextResponse.json({ ok: true });
 }

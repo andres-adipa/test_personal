@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const numero = Number(body.numero);
   const desmarcar = !!body.desmarcar;
 
-  const j = getJuego(id);
+  const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
 
   const carton = j.cartones.find((c) => c.id === cartonId);
@@ -30,6 +30,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const ya = j.marcas.find((m) => m.cartonId === cartonId && m.numero === numero);
     if (!ya) j.marcas.push({ cartonId, numero, marcadoAt: Date.now() });
   }
-  setJuego(j);
+  await setJuego(j);
   return NextResponse.json({ ok: true });
 }

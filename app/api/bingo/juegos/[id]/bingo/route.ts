@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const cartonId = String(body.cartonId ?? "");
   const patron = String(body.patron ?? "") as Patron;
 
-  const j = getJuego(id);
+  const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
   if (j.estado !== "en_curso") return NextResponse.json({ error: "El juego no está en curso" }, { status: 400 });
   if (!j.patrones.includes(patron)) {
@@ -64,6 +64,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
-  setJuego(j);
+  await setJuego(j);
   return NextResponse.json({ valido, faltantes, patron });
 }

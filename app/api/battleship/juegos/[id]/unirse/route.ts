@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!email || !nombre) {
     return NextResponse.json({ error: "Nombre y email son obligatorios" }, { status: 400 });
   }
-  const j = getJuego(id);
+  const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
   if (j.estado !== "lobby") {
     return NextResponse.json({ error: "El juego ya empezó" }, { status: 400 });
@@ -22,6 +22,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } else {
     j.jugadores.push({ email, nombre, joinedAt: Date.now(), eliminado: false, conocidas: [] });
   }
-  setJuego(j);
+  await setJuego(j);
   return NextResponse.json({ ok: true });
 }

@@ -1,54 +1,48 @@
-import fs from "node:fs";
-import path from "node:path";
+// Store de Battleship persistido en Postgres (Supabase). Tabla `battleship_juegos`.
+// El objeto Juego completo se serializa en la columna `data` (JSONB).
+
+import { db } from "@/lib/db";
 import type { Juego } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "battleship.json");
-// Saltar disco si estamos en serverless/contenedor con FS efímero (Vercel, Cloud Run).
-const FS_EFIMERO = !!process.env.VERCEL || !!process.env.K_SERVICE;
+type Row = { data: Juego | string };
 
-type Store = { juegos: Map<string, Juego> };
-
-declare global {
-  var __BATTLESHIP_STORE__: Store | undefined;
+function parseData(d: Juego | string | undefined): Juego | undefined {
+  if (d == null) return undefined;
+  return typeof d === "string" ? (JSON.parse(d) as Juego) : d;
 }
 
-function cargarDeDisco(): Store {
-  if (FS_EFIMERO) return { juegos: new Map() };
-  try {
-    if (!fs.existsSync(DATA_FILE)) return { juegos: new Map() };
-    const raw = fs.readFileSync(DATA_FILE, "utf-8");
-    const obj = JSON.parse(raw) as Record<string, Juego>;
-    return { juegos: new Map(Object.entries(obj)) };
-  } catch {
-    return { juegos: new Map() };
-  }
+export async function getJuego(id: string): Promise<Juego | undefined> {
+  const rows = await db<Row[]>`
+    SELECT data FROM battleship_juegos WHERE id = ${id} LIMIT 1
+  `;
+  return parseData(rows[0]?.data);
 }
 
-function persistirADisco(s: Store) {
-  if (FS_EFIMERO) return;
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    const obj: Record<string, Juego> = {};
-    for (const [k, v] of s.juegos) obj[k] = v;
-    fs.writeFileSync(DATA_FILE, JSON.stringify(obj));
-  } catch {}
+export async function setJuego(j: Juego): Promise<void> {
+  await db`
+    INSERT INTO battleship_juegos (id, titulo, lider, estado, data)
+    VALUES (${j.id}, ${j.titulo}, ${j.lider}, ${j.estado}, ${db.json(j as never)})
+    ON CONFLICT (id) DO UPDATE
+      SET titulo     = EXCLUDED.titulo,
+          lider      = EXCLUDED.lider,
+          estado     = EXCLUDED.estado,
+          data       = EXCLUDED.data,
+          updated_at = NOW()
+  `;
 }
 
-export const store: Store = globalThis.__BATTLESHIP_STORE__ ?? cargarDeDisco();
-if (!globalThis.__BATTLESHIP_STORE__) globalThis.__BATTLESHIP_STORE__ = store;
-
-export function getJuego(id: string): Juego | undefined {
-  return store.juegos.get(id);
+export async function eliminarJuego(id: string): Promise<boolean> {
+  const res = await db`DELETE FROM battleship_juegos WHERE id = ${id}`;
+  return res.count > 0;
 }
 
-export function setJuego(j: Juego): void {
-  store.juegos.set(j.id, j);
-  persistirADisco(store);
-}
-
-export function listarJuegos(): Juego[] {
-  return Array.from(store.juegos.values()).sort((a, b) => b.createdAt - a.createdAt);
+export async function listarJuegos(): Promise<Juego[]> {
+  const rows = await db<Row[]>`
+    SELECT data FROM battleship_juegos
+    ORDER BY created_at DESC
+    LIMIT 200
+  `;
+  return rows.map((r) => parseData(r.data)!).filter(Boolean);
 }
 
 export function nuevoId(prefix = ""): string {

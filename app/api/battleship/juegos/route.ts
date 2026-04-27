@@ -5,7 +5,7 @@ import type { Juego, ResumenJuego } from "@/lib/battleship/types";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const juegos: ResumenJuego[] = listarJuegos().map((j) => ({
+  const juegos: ResumenJuego[] = (await listarJuegos()).map((j) => ({
     id: j.id,
     titulo: j.titulo,
     lider: j.lider,
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     startedAt: null,
     endedAt: null,
   };
-  setJuego(juego);
+  await setJuego(juego);
   return NextResponse.json({ id });
 }
 

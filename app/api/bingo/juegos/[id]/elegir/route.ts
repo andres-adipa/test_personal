@@ -9,7 +9,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const email = String(body.email ?? "").trim().toLowerCase();
   const cartonIds: string[] = Array.isArray(body.cartonIds) ? body.cartonIds : [];
 
-  const j = getJuego(id);
+  const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
   if (j.estado !== "eligiendo" && j.estado !== "lobby") {
     return NextResponse.json({ error: "Ya no se puede elegir" }, { status: 400 });
@@ -39,6 +39,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
-  setJuego(j);
+  await setJuego(j);
   return NextResponse.json({ ok: true });
 }

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const fila = parseInt(body.fila, 10);
   const col = parseInt(body.col, 10);
 
-  const j = getJuego(id);
+  const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
   if (j.estado !== "en_ronda") {
     return NextResponse.json({ error: "No estamos en ronda activa" }, { status: 400 });
@@ -32,6 +32,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } else {
     j.bombas.push({ email, fila, col, ronda: j.rondaActual, lanzadaAt: Date.now() });
   }
-  setJuego(j);
+  await setJuego(j);
   return NextResponse.json({ ok: true });
 }
