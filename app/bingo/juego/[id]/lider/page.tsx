@@ -119,6 +119,15 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
     });
   };
 
+  const terminar = async () => {
+    if (!confirm("¿Terminar el juego? Se cerrará la posibilidad de empate del último premio.")) return;
+    await fetch(`/api/bingo/juegos/${id}/terminar`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: identidad.email }),
+    });
+  };
+
   if (!cargado) return null;
   if (!identidad.email) {
     return (
@@ -152,6 +161,9 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
 
   const ultimoCantado =
     data.sorteos.length > 0 ? data.sorteos[data.sorteos.length - 1].numero : null;
+  const todosLosPremiosGanados =
+    data.patrones.length > 0 &&
+    data.patrones.every((p) => data.ganadores.some((g) => g.patron === p));
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
@@ -251,14 +263,24 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
             </div>
             <div className="flex items-stretch">
               {data.estado === "en_curso" ? (
-                <button
-                  type="button"
-                  onClick={cantar}
-                  disabled={cantando || data.cantadosCount >= 99}
-                  className="rounded-xl border border-violet-600 bg-violet-600 px-10 py-8 text-2xl font-bold text-white transition-transform hover:scale-105 hover:bg-violet-500 disabled:opacity-40"
-                >
-                  Cantar<br />siguiente
-                </button>
+                todosLosPremiosGanados ? (
+                  <button
+                    type="button"
+                    onClick={terminar}
+                    className="rounded-xl border border-rose-600 bg-rose-600 px-10 py-8 text-2xl font-bold text-white transition-transform hover:scale-105 hover:bg-rose-500"
+                  >
+                    Terminar<br />juego
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={cantar}
+                    disabled={cantando || data.cantadosCount >= 99}
+                    className="rounded-xl border border-violet-600 bg-violet-600 px-10 py-8 text-2xl font-bold text-white transition-transform hover:scale-105 hover:bg-violet-500 disabled:opacity-40"
+                  >
+                    Cantar<br />siguiente
+                  </button>
+                )
               ) : (
                 <div className="flex items-center justify-center rounded-xl border border-emerald-600 bg-emerald-900/30 px-10 py-8 text-center">
                   <div>

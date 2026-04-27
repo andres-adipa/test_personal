@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold text-zinc-100">Entretenimiento</h1>
+        <h1 className="text-3xl font-bold text-zinc-100">Entretenimiento ADIPA</h1>
         <p className="mt-1 text-sm text-zinc-400">
           Juegos multijugador para correr en local o en un deploy rápido. Sin login,
           se entra con nombre y email por sala.

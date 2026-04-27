@@ -32,26 +32,53 @@ export default function Home() {
   const [identidad, guardar, cargado] = useIdentidad();
   const [juegos, setJuegos] = useState<JuegoLista[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+
+  const fetchJuegos = () => {
+    fetch("/api/bingo/juegos")
+      .then((r) => r.json())
+      .then(setJuegos)
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  };
 
   useEffect(() => {
-    const tick = () => {
-      fetch("/api/bingo/juegos")
-        .then((r) => r.json())
-        .then(setJuegos)
-        .catch(() => {})
-        .finally(() => setCargando(false));
-    };
-    tick();
-    const timer = setInterval(tick, 2000);
+    fetchJuegos();
+    const timer = setInterval(fetchJuegos, 2000);
     return () => clearInterval(timer);
   }, []);
+
+  const eliminar = async (j: JuegoLista) => {
+    if (!confirm(`¿Eliminar el juego "${j.titulo}"? Esta acción no se puede deshacer.`)) return;
+    setEliminandoId(j.id);
+    try {
+      const r = await fetch(`/api/bingo/juegos/${j.id}/eliminar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: identidad.email }),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        alert(e.error ?? "No se pudo eliminar");
+      } else {
+        fetchJuegos();
+      }
+    } finally {
+      setEliminandoId(null);
+    }
+  };
 
   if (!cargado) return null;
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-violet-400">Bingo ADIPA</h1>
+        <div>
+          <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-300">
+            ← Entretenimiento
+          </Link>
+          <h1 className="text-2xl font-bold text-violet-400">Bingo</h1>
+        </div>
         <Link
           href="/bingo/crear"
           className="rounded-lg border border-violet-600 bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-300 transition-colors hover:bg-violet-600/40"
@@ -75,16 +102,16 @@ export default function Home() {
         ) : (
           <ul className="space-y-2">
             {juegos.map((j) => {
-              const soyLider = identidad.email && identidad.email === j.lider;
+              const soyLider = !!identidad.email && identidad.email === j.lider;
               const href = soyLider
                 ? `/bingo/juego/${j.id}/lider`
                 : `/bingo/juego/${j.id}/jugar`;
               return (
-                <li key={j.id}>
-                  <Link
-                    href={href}
-                    className="flex items-center justify-between rounded-lg border border-zinc-700 bg-zinc-900/40 p-3 transition-colors hover:border-violet-500 hover:bg-zinc-900/70"
-                  >
+                <li
+                  key={j.id}
+                  className="flex items-stretch gap-0 rounded-lg border border-zinc-700 bg-zinc-900/40 transition-colors hover:border-violet-500 hover:bg-zinc-900/70"
+                >
+                  <Link href={href} className="flex flex-1 items-center justify-between p-3">
                     <div>
                       <div className="font-medium text-zinc-100">
                         {j.titulo}{" "}
@@ -104,6 +131,19 @@ export default function Home() {
                       {ESTADO_LABEL[j.estado]}
                     </span>
                   </Link>
+                  {soyLider && (
+                    <button
+                      type="button"
+                      onClick={() => eliminar(j)}
+                      disabled={eliminandoId === j.id}
+                      title="Eliminar juego"
+                      className="flex items-center justify-center px-3 text-zinc-500 transition-colors hover:text-rose-400 disabled:opacity-40"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3" />
+                      </svg>
+                    </button>
+                  )}
                 </li>
               );
             })}
