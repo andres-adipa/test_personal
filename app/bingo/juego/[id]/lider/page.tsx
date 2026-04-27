@@ -409,7 +409,6 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
                       <Carton
                         numeros={c.numeros}
                         marcados={marcas}
-                        ultimoCantado={ultimoCantado}
                         compacto
                       />
                     </div>

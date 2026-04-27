@@ -6,7 +6,6 @@ import { celdasDelPatron } from "@/lib/patrones";
 type Props = {
   numeros: Cuadricula;
   marcados?: Set<number>;
-  ultimoCantado?: number | null;
   patronResaltado?: Patron | null;
   onClickNumero?: (n: number) => void;
   compacto?: boolean;
@@ -15,7 +14,6 @@ type Props = {
 export default function Carton({
   numeros,
   marcados,
-  ultimoCantado,
   patronResaltado,
   onClickNumero,
   compacto,
@@ -37,12 +35,10 @@ export default function Carton({
               );
             }
             const marcado = marcados?.has(cell);
-            const esUltimo = ultimoCantado === cell;
             const enPatron = mask?.[f]?.[c];
             let bg = "bg-zinc-700";
             if (clickable) bg += " hover:bg-zinc-600";
             if (marcado) bg = clickable ? "bg-violet-600 hover:bg-violet-500 text-white" : "bg-violet-600 text-white";
-            if (esUltimo && !marcado) bg = "bg-amber-500/30 ring-2 ring-amber-400";
             const ring = enPatron && !marcado ? "ring-1 ring-violet-400/60" : "";
             const cls = `${celdaBase} rounded font-semibold transition-colors ${bg} ${ring} flex items-center justify-center select-none`;
             if (clickable) {

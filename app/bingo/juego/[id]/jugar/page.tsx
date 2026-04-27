@@ -354,7 +354,6 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
                   <Carton
                     numeros={c.numeros}
                     marcados={marcas}
-                    ultimoCantado={ultimoCantado}
                     onClickNumero={
                       data.estado === "en_curso" ? (n) => marcarNumero(c.id, n) : undefined
                     }
