@@ -66,7 +66,7 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
     if (!cargado || !identidad.email) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/juegos/${id}?email=${encodeURIComponent(identidad.email)}`);
+        const r = await fetch(`/api/bingo/juegos/${id}?email=${encodeURIComponent(identidad.email)}`);
         if (!r.ok) return;
         const j = await r.json();
         setData(j);
@@ -83,7 +83,7 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
     const fueOfrecido = data.cartones.some((c) => c.ofrecidoA === identidad.email);
     if (!yaEstoy || !fueOfrecido) {
       if (data.estado === "lobby" || data.estado === "eligiendo") {
-        fetch(`/api/juegos/${id}/unirse`, {
+        fetch(`/api/bingo/juegos/${id}/unirse`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ email: identidad.email, nombre: identidad.nombre }),
@@ -149,7 +149,7 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
 
   const confirmarEleccion = async () => {
     if (seleccion.length !== data.cartonesPorJugador) return;
-    await fetch(`/api/juegos/${id}/elegir`, {
+    await fetch(`/api/bingo/juegos/${id}/elegir`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: identidad.email, cartonIds: seleccion }),
@@ -160,7 +160,7 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
   const marcarNumero = async (cartonId: string, numero: number) => {
     if (data.estado !== "en_curso") return;
     const yaMarcado = misMarcasPorCarton.get(cartonId)?.has(numero);
-    await fetch(`/api/juegos/${id}/marcar`, {
+    await fetch(`/api/bingo/juegos/${id}/marcar`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -174,7 +174,7 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
 
   const cantarBingo = async (cartonId: string, patron: Patron) => {
     setResultadoBingo(null);
-    const r = await fetch(`/api/juegos/${id}/bingo`, {
+    const r = await fetch(`/api/bingo/juegos/${id}/bingo`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: identidad.email, cartonId, patron }),

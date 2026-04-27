@@ -62,7 +62,7 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
     if (!cargado || !identidad.email) return;
     const tick = async () => {
       try {
-        const r = await fetch(`/api/juegos/${id}?email=${encodeURIComponent(identidad.email)}`);
+        const r = await fetch(`/api/bingo/juegos/${id}?email=${encodeURIComponent(identidad.email)}`);
         if (!r.ok) return;
         const j = await r.json();
         setData(j);
@@ -88,7 +88,7 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
 
   const iniciar = async () => {
     setError("");
-    const r = await fetch(`/api/juegos/${id}/iniciar`, {
+    const r = await fetch(`/api/bingo/juegos/${id}/iniciar`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: identidad.email }),
@@ -102,7 +102,7 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
   const cantar = async () => {
     if (!data || data.estado !== "en_curso" || cantando) return;
     setCantando(true);
-    await fetch(`/api/juegos/${id}/cantar`, {
+    await fetch(`/api/bingo/juegos/${id}/cantar`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: identidad.email }),
@@ -112,7 +112,7 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
 
   const reiniciar = async () => {
     if (!confirm("¿Reiniciar el juego? Se regenerarán todos los cartones.")) return;
-    await fetch(`/api/juegos/${id}/reiniciar`, {
+    await fetch(`/api/bingo/juegos/${id}/reiniciar`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: identidad.email }),

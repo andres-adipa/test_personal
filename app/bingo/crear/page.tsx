@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useIdentidad } from "../components/Identidad";
+import { useIdentidad } from "@/app/components/Identidad";
 import { PATRONES } from "@/lib/patrones";
 import type { Patron } from "@/lib/types";
 
@@ -52,7 +52,7 @@ export default function CrearPage() {
       return;
     }
     setCreando(true);
-    const res = await fetch("/api/juegos", {
+    const res = await fetch("/api/bingo/juegos", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -70,7 +70,7 @@ export default function CrearPage() {
       setError(data.error ?? "Error al crear");
       return;
     }
-    router.push(`/juego/${data.id}/lider`);
+    router.push(`/bingo/juego/${data.id}/lider`);
   };
 
   const labelClass = "mb-1 block text-xs text-zinc-400";
