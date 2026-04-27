@@ -52,11 +52,7 @@ export default function Home() {
     if (!confirm(`¿Eliminar el juego "${j.titulo}"? Esta acción no se puede deshacer.`)) return;
     setEliminandoId(j.id);
     try {
-      const r = await fetch(`/api/bingo/juegos/${j.id}/eliminar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: identidad.email }),
-      });
+      const r = await fetch(`/api/bingo/juegos/${j.id}/eliminar`, { method: "POST" });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
         alert(e.error ?? "No se pudo eliminar");
@@ -131,19 +127,17 @@ export default function Home() {
                       {ESTADO_LABEL[j.estado]}
                     </span>
                   </Link>
-                  {soyLider && (
-                    <button
-                      type="button"
-                      onClick={() => eliminar(j)}
-                      disabled={eliminandoId === j.id}
-                      title="Eliminar juego"
-                      className="flex items-center justify-center px-3 text-zinc-500 transition-colors hover:text-rose-400 disabled:opacity-40"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3" />
-                      </svg>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => eliminar(j)}
+                    disabled={eliminandoId === j.id}
+                    title="Eliminar juego"
+                    className="flex items-center justify-center px-3 text-zinc-500 transition-colors hover:text-rose-400 disabled:opacity-40"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a2 2 0 012-2h2a2 2 0 012 2v3" />
+                    </svg>
+                  </button>
                 </li>
               );
             })}
