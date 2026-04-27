@@ -4,7 +4,8 @@ import type { Juego } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "battleship.json");
-const EN_VERCEL = !!process.env.VERCEL;
+// Saltar disco si estamos en serverless/contenedor con FS efímero (Vercel, Cloud Run).
+const FS_EFIMERO = !!process.env.VERCEL || !!process.env.K_SERVICE;
 
 type Store = { juegos: Map<string, Juego> };
 
@@ -13,7 +14,7 @@ declare global {
 }
 
 function cargarDeDisco(): Store {
-  if (EN_VERCEL) return { juegos: new Map() };
+  if (FS_EFIMERO) return { juegos: new Map() };
   try {
     if (!fs.existsSync(DATA_FILE)) return { juegos: new Map() };
     const raw = fs.readFileSync(DATA_FILE, "utf-8");
@@ -25,7 +26,7 @@ function cargarDeDisco(): Store {
 }
 
 function persistirADisco(s: Store) {
-  if (EN_VERCEL) return;
+  if (FS_EFIMERO) return;
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     const obj: Record<string, Juego> = {};
