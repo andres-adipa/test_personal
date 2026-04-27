@@ -47,7 +47,7 @@ export default function TestBarcoPage() {
       <Link href="/battleship" className="text-xs text-zinc-500 hover:text-zinc-300">
         ← Hundir la Flota
       </Link>
-      <h1 className="mb-2 mt-1 text-2xl font-bold text-cyan-300">Mockup de barcos</h1>
+      <h1 className="mb-2 mt-1 text-2xl font-bold text-violet-300">Mockup de barcos</h1>
       <p className="mb-6 text-sm text-zinc-400">
         Esta página solo es para previsualizar cómo van a verse los barcos en el tablero
         antes de integrarlos. Cambiá el tamaño de celda con el slider.
@@ -61,7 +61,7 @@ export default function TestBarcoPage() {
           max={80}
           value={celdaPx}
           onChange={(e) => setCeldaPx(parseInt(e.target.value, 10))}
-          className="w-64 accent-cyan-500"
+          className="w-64 accent-violet-500"
         />
         <span className="text-xs text-zinc-400">{celdaPx}px</span>
       </div>
@@ -69,7 +69,7 @@ export default function TestBarcoPage() {
       <div className="space-y-8">
         {filas.map((f) => (
           <section key={f.titulo}>
-            <h2 className="mb-3 border-l-2 border-cyan-500 pl-3 text-sm font-semibold text-zinc-200">
+            <h2 className="mb-3 border-l-2 border-violet-500 pl-3 text-sm font-semibold text-zinc-200">
               {f.titulo}
             </h2>
             <div className="flex flex-wrap items-center gap-6 rounded-lg border border-zinc-700 bg-zinc-950 p-4">

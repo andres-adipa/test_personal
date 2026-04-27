@@ -116,7 +116,7 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
         <Link href="/battleship" className="text-xs text-zinc-500 hover:text-zinc-300">
           ← Salas
         </Link>
-        <h1 className="mb-4 mt-1 text-xl font-bold text-cyan-300">Identifícate como líder</h1>
+        <h1 className="mb-4 mt-1 text-xl font-bold text-violet-300">Identifícate como líder</h1>
         <IdentidadForm valor={identidad} onGuardar={guardar} />
       </main>
     );
@@ -215,7 +215,7 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
           <Link href="/battleship" className="text-xs text-zinc-500 hover:text-zinc-300">
             ← Salas
           </Link>
-          <h1 className="text-lg font-bold text-cyan-300">{data.titulo}</h1>
+          <h1 className="text-lg font-bold text-violet-300">{data.titulo}</h1>
           <p className="text-xs text-zinc-500">
             Líder · {data.jugadores.length} jugador(es) · estado: {data.estado}
             {data.estado === "en_ronda" && ` · ronda ${data.rondaActual}`}
@@ -285,8 +285,8 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
           </div>
 
           {liderJuegaVivo && (
-            <div className="mb-2 flex flex-wrap items-center gap-3 rounded-lg border border-cyan-700 bg-cyan-950/30 p-2 text-xs">
-              <span className="text-cyan-200">
+            <div className="mb-2 flex flex-wrap items-center gap-3 rounded-lg border border-violet-700 bg-violet-950/30 p-2 text-xs">
+              <span className="text-violet-200">
                 Modo Líder Jugador · {data.estado === "en_ronda" && data.bombaPropiaRondaActual
                   ? `Tu bomba: ${coordLabel(data.bombaPropiaRondaActual.fila, data.bombaPropiaRondaActual.col)} · click otra celda para cambiar`
                   : data.estado === "en_ronda"
@@ -329,7 +329,7 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
 
         {/* Sidebar: historial de rondas */}
         <aside className="rounded-xl border border-zinc-700 bg-zinc-800 p-3 text-xs">
-          <h2 className="mb-2 border-l-2 border-cyan-500 pl-3 font-semibold text-zinc-200">
+          <h2 className="mb-2 border-l-2 border-violet-500 pl-3 font-semibold text-zinc-200">
             Historial de rondas
           </h2>
           {data.eventosPorRonda.length === 0 && data.estado !== "terminado" && (
@@ -340,7 +340,7 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
             {[...data.eventosPorRonda].reverse().map((ev) => (
               <div key={ev.ronda} className="rounded border border-zinc-700 bg-zinc-900 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="font-semibold text-cyan-300">Ronda {ev.ronda}</span>
+                  <span className="font-semibold text-violet-300">Ronda {ev.ronda}</span>
                   <span className="text-zinc-500">
                     {ev.hits.length} hit(s) · {ev.fails.length} fallo(s)
                   </span>

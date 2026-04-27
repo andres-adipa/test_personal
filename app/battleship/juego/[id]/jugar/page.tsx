@@ -147,7 +147,7 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
         <Link href="/battleship" className="text-xs text-zinc-500 hover:text-zinc-300">
           ← Salas
         </Link>
-        <h1 className="mb-4 mt-1 text-xl font-bold text-cyan-300">Entrar al juego</h1>
+        <h1 className="mb-4 mt-1 text-xl font-bold text-violet-300">Entrar al juego</h1>
         <IdentidadForm valor={identidad} onGuardar={guardar} />
       </main>
     );
@@ -209,7 +209,7 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
           <Link href="/battleship" className="text-xs text-zinc-500 hover:text-zinc-300">
             ← Salas
           </Link>
-          <h1 className="text-lg font-bold text-cyan-300">{data.titulo}</h1>
+          <h1 className="text-lg font-bold text-violet-300">{data.titulo}</h1>
         </div>
         <div className="text-right text-xs text-zinc-400">
           <div>{identidad.nombre}</div>
@@ -255,7 +255,7 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800 p-2 text-sm">
                 <span className="text-xs text-zinc-300">
-                  Ronda <span className="font-bold text-cyan-300">{data.rondaActual}</span>
+                  Ronda <span className="font-bold text-violet-300">{data.rondaActual}</span>
                 </span>
                 <span className="text-xs text-zinc-400">
                   {data.estado === "terminado"
@@ -307,7 +307,7 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
             </div>
 
             <aside className="rounded-xl border border-zinc-700 bg-zinc-800 p-3 text-xs">
-              <h2 className="mb-2 border-l-2 border-cyan-500 pl-3 font-semibold text-zinc-200">
+              <h2 className="mb-2 border-l-2 border-violet-500 pl-3 font-semibold text-zinc-200">
                 Mi historial
               </h2>
               {data.eventosPorRonda.length === 0 && data.estado !== "terminado" && (
@@ -361,7 +361,7 @@ function ItemRondaJugador({
 
   return (
     <div className="rounded border border-zinc-700 bg-zinc-900 p-2">
-      <div className="mb-1 font-semibold text-cyan-300">Ronda {evento.ronda}</div>
+      <div className="mb-1 font-semibold text-violet-300">Ronda {evento.ronda}</div>
       {sinNada && <p className="text-zinc-500">Nada para vos esta ronda.</p>}
       <ul className="space-y-1 leading-tight">
         {misAtaques.map((h, i) => (
@@ -448,7 +448,7 @@ function FilasPodio({
         <div
           key={it.jugador.email}
           className={`flex items-center justify-between rounded border px-2 py-1 ${colorPos[it.posicion] ?? "border-zinc-700 bg-zinc-900"} ${
-            miEmail && it.jugador.email === miEmail ? "ring-1 ring-cyan-300" : ""
+            miEmail && it.jugador.email === miEmail ? "ring-1 ring-violet-300" : ""
           }`}
         >
           <span className="flex items-center gap-1.5">

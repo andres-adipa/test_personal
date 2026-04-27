@@ -27,13 +27,13 @@ export default function Home() {
 
         <Link
           href="/battleship"
-          className="group rounded-xl border border-zinc-700 bg-zinc-800 p-5 transition-colors hover:border-cyan-500"
+          className="group rounded-xl border border-zinc-700 bg-zinc-800 p-5 transition-colors hover:border-violet-500"
         >
-          <h2 className="mb-2 text-lg font-semibold text-cyan-300">Hundir la Flota</h2>
+          <h2 className="mb-2 text-lg font-semibold text-violet-300">Hundir la Flota</h2>
           <p className="text-sm text-zinc-400">
             Cooperativo: cada jugador coloca un barco en un mapa compartido y todos bombardean por rondas.
           </p>
-          <span className="mt-3 inline-block text-xs text-cyan-400 opacity-70 transition-opacity group-hover:opacity-100">
+          <span className="mt-3 inline-block text-xs text-violet-400 opacity-70 transition-opacity group-hover:opacity-100">
             Entrar →
           </span>
         </Link>

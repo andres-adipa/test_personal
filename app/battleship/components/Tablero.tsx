@@ -191,8 +191,8 @@ export default function Tablero({
       }
 
       if (enPreview && fasePuedeColocar) {
-        bg = "bg-cyan-500/40";
-        borde = "border-cyan-300";
+        bg = "bg-violet-500/40";
+        borde = "border-violet-300";
       }
 
       const interactivo =

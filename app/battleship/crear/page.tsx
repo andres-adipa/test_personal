@@ -60,7 +60,7 @@ export default function CrearBattleshipPage() {
       <Link href="/battleship" className="text-xs text-zinc-500 hover:text-zinc-300">
         ← Salas
       </Link>
-      <h1 className="mb-6 mt-1 text-2xl font-bold text-cyan-300">Crear sala</h1>
+      <h1 className="mb-6 mt-1 text-2xl font-bold text-violet-300">Crear sala</h1>
 
       <div className="space-y-4 rounded-xl border border-zinc-700 bg-zinc-800 p-5">
         <div>
@@ -69,7 +69,7 @@ export default function CrearBattleshipPage() {
             value={titulo}
             onChange={(e) => setTitulo(e.target.value)}
             placeholder="Ej: Reto del viernes"
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-cyan-500 focus:outline-none"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
           />
         </div>
 
@@ -82,7 +82,7 @@ export default function CrearBattleshipPage() {
               max={5}
               value={barcosPorJugador}
               onChange={(e) => setBarcosPorJugador(parseInt(e.target.value, 10) || 1)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
             />
           </div>
           <div>
@@ -93,7 +93,7 @@ export default function CrearBattleshipPage() {
               max={6}
               value={tamanoBarco}
               onChange={(e) => setTamanoBarco(parseInt(e.target.value, 10) || 3)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
             />
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function CrearBattleshipPage() {
             type="checkbox"
             checked={permitirEspectador}
             onChange={(e) => setPermitirEspectador(e.target.checked)}
-            className="h-4 w-4 accent-cyan-500"
+            className="h-4 w-4 accent-violet-500"
           />
           Permitir modo espectador a los eliminados (verán todos los barcos hasta el final)
         </label>
@@ -113,7 +113,7 @@ export default function CrearBattleshipPage() {
             type="checkbox"
             checked={robaInformacion}
             onChange={(e) => setRobaInformacion(e.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-cyan-500"
+            className="mt-0.5 h-4 w-4 accent-violet-500"
           />
           <span>
             Roba información — al hundir un barco, absorbés todas las celdas que la
@@ -126,7 +126,7 @@ export default function CrearBattleshipPage() {
             type="checkbox"
             checked={liderJugador}
             onChange={(e) => setLiderJugador(e.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-cyan-500"
+            className="mt-0.5 h-4 w-4 accent-violet-500"
           />
           <span>
             Líder jugador — el líder cuenta como jugador (recibe barcos y dispara).
@@ -151,7 +151,7 @@ export default function CrearBattleshipPage() {
             type="button"
             disabled={!titulo.trim() || enviando}
             onClick={enviar}
-            className="rounded-lg border border-cyan-600 bg-cyan-600/20 px-4 py-2 text-sm font-medium text-cyan-200 transition-colors hover:bg-cyan-600/40 disabled:opacity-40"
+            className="rounded-lg border border-violet-600 bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-200 transition-colors hover:bg-violet-600/40 disabled:opacity-40"
           >
             {enviando ? "Creando..." : "Crear sala"}
           </button>
