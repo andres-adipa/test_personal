@@ -6,8 +6,8 @@ export default function Home() {
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-zinc-100">Entretenimiento ADIPA</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Juegos multijugador para correr en local o en un deploy rápido. Sin login,
-          se entra con nombre y email por sala.
+          Vista de revisión que estamos usando como Friends and Family. Cada sala
+          se entra con tu nombre, sin login.
         </p>
       </header>
 
@@ -31,7 +31,7 @@ export default function Home() {
         >
           <h2 className="mb-2 text-lg font-semibold text-violet-300">Hundir la Flota</h2>
           <p className="text-sm text-zinc-400">
-            Cooperativo: cada jugador coloca un barco en un mapa compartido y todos bombardean por rondas.
+            Cada jugador coloca un barco en un mapa compartido y bombardean por rondas hasta que solo quede uno en pie.
           </p>
           <span className="mt-3 inline-block text-xs text-violet-400 opacity-70 transition-opacity group-hover:opacity-100">
             Entrar →
