@@ -8,15 +8,14 @@ type ResumenJuego = {
   id: string;
   titulo: string;
   lider: string;
-  estado: "lobby" | "colocando" | "en_ronda" | "revelando" | "terminado";
+  estado: "lobby" | "en_ronda" | "revelando" | "terminado";
   jugadores: number;
-  config: { barcosPorJugador: number; tamanoBarco: number; prellenarBarcos: boolean };
+  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean };
   createdAt: number;
 };
 
 const ESTADO_LABEL: Record<string, string> = {
   lobby: "Sala abierta",
-  colocando: "Colocando barcos",
   en_ronda: "En ronda",
   revelando: "Revelando",
   terminado: "Terminado",
@@ -24,7 +23,6 @@ const ESTADO_LABEL: Record<string, string> = {
 
 const ESTADO_COLOR: Record<string, string> = {
   lobby: "bg-emerald-500/20 text-emerald-400",
-  colocando: "bg-amber-500/20 text-amber-400",
   en_ronda: "bg-cyan-500/20 text-cyan-300",
   revelando: "bg-fuchsia-500/20 text-fuchsia-300",
   terminado: "bg-zinc-500/20 text-zinc-400",
@@ -103,7 +101,8 @@ export default function BattleshipHome() {
                         Líder: {j.lider} · {j.jugadores} jugador(es) ·{" "}
                         {j.config.barcosPorJugador} barco(s) por jugador, tamaño{" "}
                         {j.config.tamanoBarco}
-                        {j.config.prellenarBarcos ? " · prellenado" : ""}
+                        {j.config.permitirEspectador ? " · espectador permitido" : " · sin espectador"}
+                        {j.config.robaInformacion && " · roba info"}
                       </div>
                     </div>
                     <span

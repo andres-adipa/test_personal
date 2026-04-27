@@ -25,24 +25,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   );
 
   const barcos: Barco[] = [];
-  if (j.config.prellenarBarcos) {
-    for (const jug of j.jugadores) {
-      const nuevos = colocarAleatorio(
-        jug.email,
-        j.config.barcosPorJugador,
-        j.config.tamanoBarco,
-        tablero,
-        barcos,
-      );
-      barcos.push(...nuevos);
-    }
+  for (const jug of j.jugadores) {
+    const nuevos = colocarAleatorio(
+      jug.email,
+      j.config.barcosPorJugador,
+      j.config.tamanoBarco,
+      tablero,
+      barcos,
+    );
+    barcos.push(...nuevos);
   }
 
   j.tablero = tablero;
   j.barcos = barcos;
-  j.estado = "colocando";
+  j.estado = "en_ronda";
+  j.rondaActual = 1;
   j.startedAt = Date.now();
-  for (const p of j.jugadores) p.listo = false;
+  for (const p of j.jugadores) p.eliminado = false;
   setJuego(j);
   return NextResponse.json({ ok: true });
 }

@@ -23,7 +23,9 @@ export async function POST(req: NextRequest) {
   const lider = String(body.lider ?? "").trim().toLowerCase();
   const barcosPorJugador = clamp(parseInt(body.barcosPorJugador, 10) || 1, 1, 5);
   const tamanoBarco = clamp(parseInt(body.tamanoBarco, 10) || 3, 2, 6);
-  const prellenarBarcos = body.prellenarBarcos !== false;
+  const permitirEspectador = body.permitirEspectador !== false;
+  const robaInformacion = body.robaInformacion === true;
+  const liderJugador = body.liderJugador === true;
 
   if (!titulo || !lider) {
     return NextResponse.json({ error: "Título y email del líder son obligatorios" }, { status: 400 });
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
     id,
     titulo,
     lider,
-    config: { barcosPorJugador, tamanoBarco, prellenarBarcos },
+    config: { barcosPorJugador, tamanoBarco, permitirEspectador, robaInformacion, liderJugador },
     estado: "lobby",
     tablero: null,
     jugadores: [],
@@ -42,6 +44,7 @@ export async function POST(req: NextRequest) {
     bombas: [],
     hits: [],
     hundidos: [],
+    eventosPorRonda: [],
     rondaActual: 0,
     createdAt: Date.now(),
     startedAt: null,

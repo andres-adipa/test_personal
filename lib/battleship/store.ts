@@ -1,4 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { Juego } from "./types";
+
+const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_FILE = path.join(DATA_DIR, "battleship.json");
+const EN_VERCEL = !!process.env.VERCEL;
 
 type Store = { juegos: Map<string, Juego> };
 
@@ -6,7 +12,29 @@ declare global {
   var __BATTLESHIP_STORE__: Store | undefined;
 }
 
-export const store: Store = globalThis.__BATTLESHIP_STORE__ ?? { juegos: new Map() };
+function cargarDeDisco(): Store {
+  if (EN_VERCEL) return { juegos: new Map() };
+  try {
+    if (!fs.existsSync(DATA_FILE)) return { juegos: new Map() };
+    const raw = fs.readFileSync(DATA_FILE, "utf-8");
+    const obj = JSON.parse(raw) as Record<string, Juego>;
+    return { juegos: new Map(Object.entries(obj)) };
+  } catch {
+    return { juegos: new Map() };
+  }
+}
+
+function persistirADisco(s: Store) {
+  if (EN_VERCEL) return;
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    const obj: Record<string, Juego> = {};
+    for (const [k, v] of s.juegos) obj[k] = v;
+    fs.writeFileSync(DATA_FILE, JSON.stringify(obj));
+  } catch {}
+}
+
+export const store: Store = globalThis.__BATTLESHIP_STORE__ ?? cargarDeDisco();
 if (!globalThis.__BATTLESHIP_STORE__) globalThis.__BATTLESHIP_STORE__ = store;
 
 export function getJuego(id: string): Juego | undefined {
@@ -15,6 +43,7 @@ export function getJuego(id: string): Juego | undefined {
 
 export function setJuego(j: Juego): void {
   store.juegos.set(j.id, j);
+  persistirADisco(store);
 }
 
 export function listarJuegos(): Juego[] {

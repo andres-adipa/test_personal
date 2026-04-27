@@ -1,6 +1,5 @@
 export type EstadoJuego =
   | "lobby"
-  | "colocando"
   | "en_ronda"
   | "revelando"
   | "terminado";
@@ -21,7 +20,8 @@ export type Jugador = {
   email: string;
   nombre: string;
   joinedAt: number;
-  listo: boolean;
+  eliminado: boolean;
+  conocidas: string[]; // celdas "fila,col" que el jugador sabe (propias + heredadas)
 };
 
 export type Bomba = {
@@ -44,10 +44,46 @@ export type Hundimiento = {
   ronda: number;
 };
 
+export type EventoHit = {
+  atacante: string;       // email
+  atacanteNombre: string;
+  victima: string;        // email dueño del barco
+  victimaNombre: string;
+  barcoId: string;
+  fila: number;
+  col: number;
+  hundeBarco: boolean;    // si este hit hundió el barco
+};
+
+export type EventoFail = {
+  atacante: string;       // email
+  atacanteNombre: string;
+  fila: number;
+  col: number;
+};
+
+export type EventoHerencia = {
+  hundidor: string;
+  hundidorNombre: string;
+  victima: string;
+  victimaNombre: string;
+  celdasGanadas: number;
+};
+
+export type EventoRonda = {
+  ronda: number;
+  hits: EventoHit[];
+  fails: EventoFail[];
+  herencias: EventoHerencia[];
+  eliminados: string[];   // emails recién eliminados esta ronda
+};
+
 export type ConfigJuego = {
   barcosPorJugador: number;
   tamanoBarco: number;
-  prellenarBarcos: boolean;
+  permitirEspectador: boolean;
+  robaInformacion: boolean;
+  liderJugador: boolean;
 };
 
 export type Tablero = {
@@ -67,6 +103,7 @@ export type Juego = {
   bombas: Bomba[];
   hits: Hit[];
   hundidos: Hundimiento[];
+  eventosPorRonda: EventoRonda[];
   rondaActual: number;
   createdAt: number;
   startedAt: number | null;

@@ -11,7 +11,9 @@ export default function CrearBattleshipPage() {
   const [titulo, setTitulo] = useState("");
   const [barcosPorJugador, setBarcosPorJugador] = useState(1);
   const [tamanoBarco, setTamanoBarco] = useState(3);
-  const [prellenarBarcos, setPrellenarBarcos] = useState(true);
+  const [permitirEspectador, setPermitirEspectador] = useState(true);
+  const [robaInformacion, setRobaInformacion] = useState(false);
+  const [liderJugador, setLiderJugador] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +37,9 @@ export default function CrearBattleshipPage() {
           lider: identidad.email,
           barcosPorJugador,
           tamanoBarco,
-          prellenarBarcos,
+          permitirEspectador,
+          robaInformacion,
+          liderJugador,
         }),
       });
       const j = await r.json();
@@ -97,12 +101,42 @@ export default function CrearBattleshipPage() {
         <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
           <input
             type="checkbox"
-            checked={prellenarBarcos}
-            onChange={(e) => setPrellenarBarcos(e.target.checked)}
+            checked={permitirEspectador}
+            onChange={(e) => setPermitirEspectador(e.target.checked)}
             className="h-4 w-4 accent-cyan-500"
           />
-          Prellenar barcos al iniciar (cada jugador entra con sus barcos puestos al azar y puede moverlos)
+          Permitir modo espectador a los eliminados (verán todos los barcos hasta el final)
         </label>
+
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={robaInformacion}
+            onChange={(e) => setRobaInformacion(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-cyan-500"
+          />
+          <span>
+            Roba información — al hundir un barco, absorbés todas las celdas que la
+            víctima conocía (acumulativo y transitivo). Acelera partidas largas.
+          </span>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={liderJugador}
+            onChange={(e) => setLiderJugador(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-cyan-500"
+          />
+          <span>
+            Líder jugador — el líder cuenta como jugador (recibe barcos y dispara).
+            Cuando lo eliminan vuelve al modo solo-líder.
+          </span>
+        </label>
+
+        <p className="text-xs text-zinc-500">
+          Los barcos se posicionan automáticamente al iniciar — los jugadores no los colocan.
+        </p>
 
         {error && <div className="text-sm text-red-400">{error}</div>}
 
