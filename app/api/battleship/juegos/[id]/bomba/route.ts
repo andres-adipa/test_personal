@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJuego, setJuego } from "@/lib/battleship/store";
+import { getJuego, setJuegoSiEstado } from "@/lib/battleship/store";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } else {
     j.bombas.push({ email, fila, col, ronda: j.rondaActual, lanzadaAt: Date.now() });
   }
-  await setJuego(j);
+
+  // Auto-lanzamiento: si todos los activos ya enviaron su bomba y la sala
+  // tiene autoLanzar activo, arrancamos la cuenta atrás (3-2-1).
+  if (j.config.autoLanzar && !j.cuentaAtrasIniciadaAt) {
+    const activos = j.jugadores.filter((p) => !p.eliminado).length;
+    const conBomba = new Set(
+      j.bombas.filter((b) => b.ronda === j.rondaActual).map((b) => b.email),
+    ).size;
+    if (activos > 0 && conBomba >= activos) {
+      j.cuentaAtrasIniciadaAt = Date.now();
+    }
+  }
+
+  const ok = await setJuegoSiEstado(j, "en_ronda");
+  if (!ok) {
+    return NextResponse.json({ error: "La ronda ya cerró" }, { status: 409 });
+  }
   return NextResponse.json({ ok: true });
 }

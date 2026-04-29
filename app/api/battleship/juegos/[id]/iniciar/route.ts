@@ -41,6 +41,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   j.estado = "en_ronda";
   j.rondaActual = 1;
   j.startedAt = Date.now();
+  j.revelandoStartedAt = null;
+  j.cuentaAtrasIniciadaAt = null;
   for (const p of j.jugadores) p.eliminado = false;
   await setJuego(j);
   return NextResponse.json({ ok: true });

@@ -14,6 +14,7 @@ export default function CrearBattleshipPage() {
   const [permitirEspectador, setPermitirEspectador] = useState(true);
   const [robaInformacion, setRobaInformacion] = useState(false);
   const [liderJugador, setLiderJugador] = useState(false);
+  const [autoLanzar, setAutoLanzar] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +41,7 @@ export default function CrearBattleshipPage() {
           permitirEspectador,
           robaInformacion,
           liderJugador,
+          autoLanzar,
         }),
       });
       const j = await r.json();
@@ -116,7 +118,7 @@ export default function CrearBattleshipPage() {
             className="mt-0.5 h-4 w-4 accent-violet-500"
           />
           <span>
-            Roba información — al hundir un barco, absorbés todas las celdas que la
+            Roba información — al hundir un barco, absorbes todas las celdas que la
             víctima conocía (acumulativo y transitivo). Acelera partidas largas.
           </span>
         </label>
@@ -131,6 +133,20 @@ export default function CrearBattleshipPage() {
           <span>
             Líder jugador — el líder cuenta como jugador (recibe barcos y dispara).
             Cuando lo eliminan vuelve al modo solo-líder.
+          </span>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={autoLanzar}
+            onChange={(e) => setAutoLanzar(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-violet-500"
+          />
+          <span>
+            Lanzar automáticamente las bombas cuando todos disparen — cuando
+            todos los jugadores activos enviaron su disparo, se hace una cuenta
+            regresiva 3-2-1 y se revela la ronda. El líder igual puede cerrar antes.
           </span>
         </label>
 

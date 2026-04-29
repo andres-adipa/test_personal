@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJuego } from "@/lib/battleship/store";
+import { getJuego, setJuegoSiEstado } from "@/lib/battleship/store";
 import { celdasDeBarco } from "@/lib/battleship/colocacion";
-import type { EventoHit, EventoRonda } from "@/lib/battleship/types";
+import {
+  COUNTDOWN_DURATION_MS,
+  REVELANDO_DURATION_MS,
+  avanzarPostRevelado,
+  cerrarRondaEnMemoria,
+} from "@/lib/battleship/cerrarRonda";
+import type {
+  EventoHit,
+  EventoHitPublico,
+  EventoRonda,
+} from "@/lib/battleship/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,20 +21,49 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const j = await getJuego(id);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
 
+  // ---------- Lazy state advance (bug fix: serverless setTimeout no siempre corre)
+  // Usa UPDATE condicional para evitar races: si dos GETs llegan a la vez,
+  // sólo uno logra avanzar el estado.
+  if (
+    j.estado === "en_ronda" &&
+    j.config.autoLanzar &&
+    j.cuentaAtrasIniciadaAt &&
+    Date.now() - j.cuentaAtrasIniciadaAt >= COUNTDOWN_DURATION_MS
+  ) {
+    const original = j.estado;
+    cerrarRondaEnMemoria(j);
+    const ok = await setJuegoSiEstado(j, original);
+    if (!ok) {
+      // Otro request ganó la carrera. Recargar estado fresco.
+      const fresco = await getJuego(id);
+      if (fresco) Object.assign(j, fresco);
+    }
+  }
+  if (
+    j.estado === "revelando" &&
+    j.revelandoStartedAt &&
+    Date.now() - j.revelandoStartedAt >= REVELANDO_DURATION_MS
+  ) {
+    const original = j.estado;
+    if (avanzarPostRevelado(j)) {
+      const ok = await setJuegoSiEstado(j, original);
+      if (!ok) {
+        const fresco = await getJuego(id);
+        if (fresco) Object.assign(j, fresco);
+      }
+    }
+  }
+
   const esLider = !!email && email === j.lider;
   const jugador = j.jugadores.find((p) => p.email === email) ?? null;
   const estoyEliminado = !!jugador?.eliminado;
   const espectadorActivo =
     estoyEliminado && j.config.permitirEspectador && j.estado !== "terminado";
-  // Si el modo "líder jugador" está activo y el líder está vivo, juega como
-  // cualquier otro: ve sólo sus barcos. Cuando lo eliminan, vuelve a ver todo.
   const liderJuegaVivo =
     esLider && !!j.config.liderJugador && !!jugador && !jugador.eliminado;
   const verTodo =
     (esLider && !liderJuegaVivo) || espectadorActivo || j.estado === "terminado";
 
-  // El jugador siempre ve sus barcos; además, todo barco hundido es público
-  // para todos (así nadie se estanca buscando un barco ya muerto).
   const barcosVisibles = verTodo
     ? j.barcos
     : j.barcos.filter(
@@ -34,8 +73,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const bombaPropiaRondaActual =
     j.bombas.find((b) => b.email === email && b.ronda === j.rondaActual) ?? null;
 
-  // Líder/espectador ven todas las bombas, incluyendo las pendientes de la ronda actual.
-  // Jugador no ve bombas de otros (sólo las suyas).
   const bombasRevReales =
     j.estado === "revelando" || j.estado === "terminado"
       ? j.bombas
@@ -46,10 +83,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const totalCeldasBarcos = j.barcos.reduce((acc, b) => acc + b.tamano, 0);
   const totalHitsUnicos = new Set(j.hits.map((h) => `${h.fila},${h.col}`)).size;
 
-  // Construir set de celdas visibles para el jugador:
-  // - lo que él disparó (siempre en "conocidas")
-  // - lo que heredó al hundir (también está en "conocidas" si robaInformacion=ON)
-  // - celdas donde le pegaron a sus barcos (víctima)
   const celdasVisibles = new Set<string>();
   for (const k of jugador?.conocidas ?? []) celdasVisibles.add(k);
   for (const h of j.hits) {
@@ -58,7 +91,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (b?.jugadorEmail === email) celdasVisibles.add(`${h.fila},${h.col}`);
   }
 
-  // Filtro de hits y bombas según rol
   const hitsVisibles = verTodo
     ? j.hits
     : j.hits.filter((h) => celdasVisibles.has(`${h.fila},${h.col}`));
@@ -77,15 +109,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (verTodo) {
     eventos = j.eventosPorRonda;
   } else {
-    eventos = j.eventosPorRonda.map((ev) => ({
-      ronda: ev.ronda,
-      hits: ev.hits.filter(
+    eventos = j.eventosPorRonda.map((ev) => {
+      const hitsInvolucrado = ev.hits.filter(
         (h: EventoHit) => h.atacante === email || h.victima === email,
-      ),
-      fails: ev.fails.filter((f) => f.atacante === email),
-      herencias: (ev.herencias ?? []).filter((h) => h.hundidor === email),
-      eliminados: ev.eliminados,
-    }));
+      );
+      const hitsPublicos: EventoHitPublico[] = ev.hits
+        .filter((h: EventoHit) => h.atacante !== email && h.victima !== email)
+        .map((h) => ({
+          atacanteNombre: h.atacanteNombre,
+          victimaNombre: h.victimaNombre,
+          hundeBarco: h.hundeBarco,
+        }));
+      return {
+        ronda: ev.ronda,
+        hits: hitsInvolucrado,
+        fails: ev.fails.filter((f) => f.atacante === email),
+        herencias: (ev.herencias ?? []).filter((h) => h.hundidor === email),
+        eliminados: ev.eliminados,
+        hitsPublicos,
+      };
+    });
   }
 
   return NextResponse.json({
@@ -117,6 +160,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     totalHitsUnicos,
     startedAt: j.startedAt,
     endedAt: j.endedAt,
+    revelandoStartedAt: j.revelandoStartedAt,
+    cuentaAtrasIniciadaAt: j.cuentaAtrasIniciadaAt,
     esLider,
     estoyEliminado,
     esEspectador: espectadorActivo,

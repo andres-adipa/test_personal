@@ -31,6 +31,26 @@ export async function setJuego(j: Juego): Promise<void> {
   `;
 }
 
+// UPDATE condicional: sólo persiste si el estado actual en BD coincide con
+// `estadoEsperado`. Evita races cuando varios GETs intentan avanzar el estado
+// en paralelo (lazy advance). Devuelve `true` si la fila fue actualizada.
+export async function setJuegoSiEstado(
+  j: Juego,
+  estadoEsperado: Juego["estado"],
+): Promise<boolean> {
+  const res = await db`
+    UPDATE battleship_juegos
+       SET titulo     = ${j.titulo},
+           lider      = ${j.lider},
+           estado     = ${j.estado},
+           data       = ${db.json(j as never)},
+           updated_at = NOW()
+     WHERE id = ${j.id}
+       AND estado = ${estadoEsperado}
+  `;
+  return res.count > 0;
+}
+
 export async function eliminarJuego(id: string): Promise<boolean> {
   const res = await db`DELETE FROM battleship_juegos WHERE id = ${id}`;
   return res.count > 0;

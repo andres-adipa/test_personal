@@ -70,12 +70,19 @@ export type EventoHerencia = {
   celdasGanadas: number;
 };
 
+export type EventoHitPublico = {
+  atacanteNombre: string;
+  victimaNombre: string;
+  hundeBarco: boolean;
+};
+
 export type EventoRonda = {
   ronda: number;
   hits: EventoHit[];
   fails: EventoFail[];
   herencias: EventoHerencia[];
   eliminados: string[];   // emails recién eliminados esta ronda
+  hitsPublicos?: EventoHitPublico[]; // sólo se llena al filtrar para un jugador no involucrado
 };
 
 export type ConfigJuego = {
@@ -84,6 +91,7 @@ export type ConfigJuego = {
   permitirEspectador: boolean;
   robaInformacion: boolean;
   liderJugador: boolean;
+  autoLanzar: boolean;
 };
 
 export type Tablero = {
@@ -108,6 +116,8 @@ export type Juego = {
   createdAt: number;
   startedAt: number | null;
   endedAt: number | null;
+  revelandoStartedAt: number | null;
+  cuentaAtrasIniciadaAt: number | null;
 };
 
 export type ResumenJuego = {

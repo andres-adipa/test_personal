@@ -42,7 +42,7 @@ type Estado = {
   id: string;
   titulo: string;
   lider: string;
-  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean };
+  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean };
   estado: "lobby" | "en_ronda" | "revelando" | "terminado";
   tablero: { ancho: number; alto: number } | null;
   rondaActual: number;
@@ -56,10 +56,14 @@ type Estado = {
   bombaPropiaRondaActual: Bomba | null;
   totalCeldasBarcos: number;
   totalHitsUnicos: number;
+  revelandoStartedAt: number | null;
+  cuentaAtrasIniciadaAt: number | null;
   esLider: boolean;
   estoyEliminado: boolean;
   esEspectador: boolean;
 };
+
+const COUNTDOWN_MS = 3000;
 
 export default function LiderBattleshipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -67,6 +71,7 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
   const [data, setData] = useState<Estado | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unidoComoJugador, setUnidoComoJugador] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const lastActionAt = useRef(0);
 
   useEffect(() => {
@@ -84,6 +89,11 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, [id, identidad.email, cargado]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
 
   // Auto-unirse como jugador si la sala tiene "Líder jugador" activo
   useEffect(() => {
@@ -260,6 +270,25 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
         </div>
       )}
 
+      {(() => {
+        const etapa = computarEtapaLider(data, now, liderJuegaVivo);
+        return etapa ? (
+          <div
+            className={`mb-3 rounded-2xl border-2 px-5 py-4 text-center shadow-lg ${etapa.clases}`}
+          >
+            <div className="text-[11px] uppercase tracking-widest opacity-70">
+              {etapa.subtitulo}
+            </div>
+            <div className="mt-0.5 text-2xl font-extrabold uppercase tracking-wide sm:text-3xl">
+              {etapa.titulo}
+            </div>
+            {etapa.detalle && (
+              <div className="mt-1 text-xs opacity-90">{etapa.detalle}</div>
+            )}
+          </div>
+        ) : null;
+      })()}
+
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         {/* Columna principal */}
         <div>
@@ -389,6 +418,82 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
       </div>
     </main>
   );
+}
+
+type EtapaInfoLider = {
+  titulo: string;
+  subtitulo: string;
+  detalle?: string;
+  clases: string;
+};
+
+function computarEtapaLider(
+  d: Estado,
+  now: number,
+  liderJuegaVivo: boolean,
+): EtapaInfoLider | null {
+  if (d.estado === "lobby") {
+    return {
+      titulo: "Lobby",
+      subtitulo: "Etapa",
+      detalle: "Pulsa Iniciar cuando estén todos",
+      clases: "border-zinc-600 bg-zinc-800/60 text-zinc-200",
+    };
+  }
+  if (d.estado === "terminado") {
+    return {
+      titulo: "Juego terminado",
+      subtitulo: "Etapa",
+      clases: "border-emerald-600 bg-emerald-950/50 text-emerald-100",
+    };
+  }
+  if (d.estado === "revelando") {
+    return {
+      titulo: "Revelando ronda",
+      subtitulo: `Ronda ${d.rondaActual}`,
+      detalle: "Resultado en pantalla",
+      clases: "border-fuchsia-600 bg-fuchsia-950/50 text-fuchsia-100",
+    };
+  }
+  // en_ronda
+  if (d.config.autoLanzar && d.cuentaAtrasIniciadaAt) {
+    const restante = Math.max(0, COUNTDOWN_MS - (now - d.cuentaAtrasIniciadaAt));
+    const segundos = Math.max(1, Math.ceil(restante / 1000));
+    return {
+      titulo: `Lanzando en ${segundos}…`,
+      subtitulo: `Ronda ${d.rondaActual}`,
+      detalle: "Puedes pulsar “Cerrar ronda y revelar” para forzarlo ahora",
+      clases:
+        "border-amber-500 bg-amber-950/50 text-amber-100 animate-pulse",
+    };
+  }
+  if (liderJuegaVivo && d.bombaPropiaRondaActual) {
+    return {
+      titulo: "Esperando disparos",
+      subtitulo: `Ronda ${d.rondaActual}`,
+      detalle: `${d.bombasRondaActualCount}/${
+        d.jugadores.filter((p) => !p.eliminado).length
+      } jugadores ya dispararon`,
+      clases: "border-sky-600 bg-sky-950/50 text-sky-100",
+    };
+  }
+  if (liderJuegaVivo && !d.bombaPropiaRondaActual) {
+    return {
+      titulo: "Dispara",
+      subtitulo: `Ronda ${d.rondaActual}`,
+      detalle: "Click en una celda para lanzar tu bomba",
+      clases: "border-emerald-500 bg-emerald-950/50 text-emerald-100",
+    };
+  }
+  // Líder no jugador o eliminado
+  return {
+    titulo: "Esperando disparos",
+    subtitulo: `Ronda ${d.rondaActual}`,
+    detalle: `${d.bombasRondaActualCount}/${
+      d.jugadores.filter((p) => !p.eliminado).length
+    } jugadores ya dispararon`,
+    clases: "border-sky-600 bg-sky-950/50 text-sky-100",
+  };
 }
 
 function PanelGanadorLider({ podio }: { podio: ItemPodio[] }) {

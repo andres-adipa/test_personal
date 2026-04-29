@@ -20,6 +20,12 @@ type EventoHit = {
   hundeBarco: boolean;
 };
 
+type EventoHitPublico = {
+  atacanteNombre: string;
+  victimaNombre: string;
+  hundeBarco: boolean;
+};
+
 type EventoHerencia = {
   hundidor: string;
   hundidorNombre: string;
@@ -34,13 +40,14 @@ type EventoRonda = {
   fails: { atacante: string; atacanteNombre: string; fila: number; col: number }[];
   herencias: EventoHerencia[];
   eliminados: string[];
+  hitsPublicos?: EventoHitPublico[];
 };
 
 type Estado = {
   id: string;
   titulo: string;
   lider: string;
-  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean };
+  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean };
   estado: "lobby" | "en_ronda" | "revelando" | "terminado";
   tablero: { ancho: number; alto: number } | null;
   rondaActual: number;
@@ -56,12 +63,15 @@ type Estado = {
   totalHitsUnicos: number;
   startedAt: number | null;
   endedAt: number | null;
+  revelandoStartedAt: number | null;
+  cuentaAtrasIniciadaAt: number | null;
   esLider: boolean;
   estoyEliminado: boolean;
   esEspectador: boolean;
 };
 
 const POLL_FREEZE_MS = 1500;
+const COUNTDOWN_MS = 3000;
 
 export default function JugarBattleshipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -69,6 +79,7 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
   const [data, setData] = useState<Estado | null>(null);
   const [unido, setUnido] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const lastActionAt = useRef(0);
 
   useEffect(() => {
@@ -86,6 +97,12 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, [id, identidad.email, cargado]);
+
+  // Reloj para la cuenta atrás (refresca cada 250ms para fluidez)
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     if (!data || unido || !identidad.email) return;
@@ -202,6 +219,21 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
   const nombrePorEmail: Record<string, string> = {};
   for (const p of data.jugadores) nombrePorEmail[p.email] = p.nombre;
 
+  // Etapa visible (banner grande)
+  const etapa = computarEtapa(data, now);
+
+  // ¿Soy ganador?
+  const yoSoyGanador =
+    data.estado === "terminado" &&
+    podio.length > 0 &&
+    podio[0].jugador.email === identidad.email &&
+    !podio[0].jugador.eliminado;
+
+  // ¿Acabo de caer en la ronda que se está revelando?
+  const caiEstaRonda =
+    data.estado === "revelando" &&
+    !!ultimaRondaRevelada?.eliminados.includes(identidad.email);
+
   return (
     <main className="mx-auto max-w-7xl px-3 py-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -226,7 +258,54 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
         </div>
       )}
 
-      {data.estoyEliminado && data.esEspectador && (
+      {/* Banner de etapa */}
+      {etapa && (
+        <div
+          className={`mb-3 rounded-2xl border-2 px-5 py-4 text-center shadow-lg ${etapa.clases}`}
+        >
+          <div className="text-[11px] uppercase tracking-widest opacity-70">
+            {etapa.subtitulo}
+          </div>
+          <div className="mt-0.5 text-2xl font-extrabold uppercase tracking-wide sm:text-3xl">
+            {etapa.titulo}
+          </div>
+          {etapa.detalle && (
+            <div className="mt-1 text-xs opacity-90">{etapa.detalle}</div>
+          )}
+        </div>
+      )}
+
+      {/* Banner: acabas de caer (revelando) */}
+      {caiEstaRonda && (
+        <div className="mb-3 rounded-2xl border-2 border-red-600 bg-gradient-to-br from-red-950/80 via-red-900/40 to-red-950/60 p-5 text-center shadow-lg shadow-red-900/40">
+          <div className="text-3xl">🪦</div>
+          <div className="mt-1 text-2xl font-extrabold uppercase tracking-wide text-red-200">
+            Caíste
+          </div>
+          <div className="mt-1 text-sm text-red-300">
+            Hundieron tu último barco esta ronda.
+          </div>
+        </div>
+      )}
+
+      {/* Banner de derrota cuando terminó y perdí */}
+      {data.estado === "terminado" && data.estoyEliminado && !yoSoyGanador && (
+        <div className="mb-3 rounded-2xl border-2 border-red-600 bg-gradient-to-br from-red-950/80 via-red-900/40 to-red-950/60 p-5 text-center shadow-lg shadow-red-900/40">
+          <div className="text-3xl">🪦</div>
+          <div className="mt-1 text-2xl font-extrabold uppercase tracking-wide text-red-200">
+            Perdiste
+          </div>
+          {podio[0] && (
+            <div className="mt-1 text-sm text-red-300">
+              {podio[0].jugador.eliminado
+                ? `Nadie quedó en pie. ${podio[0].jugador.nombre} fue el último en caer.`
+                : `Ganó ${podio[0].jugador.nombre}.`}
+            </div>
+          )}
+        </div>
+      )}
+
+      {data.estoyEliminado && data.estado !== "terminado" && data.esEspectador && (
         <div className="mb-2 rounded-lg border border-amber-700 bg-amber-950/50 p-3 text-sm text-amber-200">
           🪦 Fuiste eliminado. Estás en modo espectador — ves todos los barcos pero ya no puedes disparar.
         </div>
@@ -333,6 +412,75 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
   );
 }
 
+type EtapaInfo = {
+  titulo: string;
+  subtitulo: string;
+  detalle?: string;
+  clases: string;
+};
+
+function computarEtapa(d: Estado, now: number): EtapaInfo | null {
+  if (d.estado === "lobby") {
+    return {
+      titulo: "Lobby",
+      subtitulo: "Etapa",
+      detalle: "Esperando que el líder inicie",
+      clases: "border-zinc-600 bg-zinc-800/60 text-zinc-200",
+    };
+  }
+  if (d.estado === "terminado") return null; // banner de derrota/victoria toma la voz
+
+  if (d.estado === "revelando") {
+    return {
+      titulo: "Revelando ronda",
+      subtitulo: `Ronda ${d.rondaActual}`,
+      detalle: "Mira el resultado de los disparos",
+      clases: "border-fuchsia-600 bg-fuchsia-950/50 text-fuchsia-100",
+    };
+  }
+
+  // en_ronda
+  if (d.estoyEliminado) {
+    return {
+      titulo: "Mira nomás",
+      subtitulo: `Ronda ${d.rondaActual} · Eliminado`,
+      detalle: "No puedes disparar",
+      clases: "border-zinc-600 bg-zinc-800/60 text-zinc-300",
+    };
+  }
+
+  // ¿Cuenta atrás activa?
+  if (d.config.autoLanzar && d.cuentaAtrasIniciadaAt) {
+    const restante = Math.max(0, COUNTDOWN_MS - (now - d.cuentaAtrasIniciadaAt));
+    const segundos = Math.max(1, Math.ceil(restante / 1000));
+    return {
+      titulo: `Lanzando en ${segundos}…`,
+      subtitulo: `Ronda ${d.rondaActual}`,
+      detalle: "Todos los disparos enviados — preparándose para revelar",
+      clases:
+        "border-amber-500 bg-amber-950/50 text-amber-100 animate-pulse",
+    };
+  }
+
+  if (d.bombaPropiaRondaActual) {
+    return {
+      titulo: "Esperando disparos",
+      subtitulo: `Ronda ${d.rondaActual}`,
+      detalle: `${d.bombasRondaActualCount}/${
+        d.jugadores.filter((p) => !p.eliminado).length
+      } jugadores ya dispararon`,
+      clases: "border-sky-600 bg-sky-950/50 text-sky-100",
+    };
+  }
+
+  return {
+    titulo: "Dispara",
+    subtitulo: `Ronda ${d.rondaActual}`,
+    detalle: "Click en una celda para lanzar tu bomba",
+    clases: "border-emerald-500 bg-emerald-950/50 text-emerald-100",
+  };
+}
+
 function ItemRondaJugador({
   evento,
   miEmail,
@@ -351,18 +499,20 @@ function ItemRondaJugador({
     .join(", ");
 
   const misHerencias = evento.herencias ?? [];
+  const hitsPublicos = evento.hitsPublicos ?? [];
   const sinNada =
     misAtaques.length === 0 &&
     golpesRecibidos.length === 0 &&
     !fuiEliminadoEstaRonda &&
     otrosEliminados.length === 0 &&
     evento.fails.length === 0 &&
-    misHerencias.length === 0;
+    misHerencias.length === 0 &&
+    hitsPublicos.length === 0;
 
   return (
     <div className="rounded border border-zinc-700 bg-zinc-900 p-2">
       <div className="mb-1 font-semibold text-violet-300">Ronda {evento.ronda}</div>
-      {sinNada && <p className="text-zinc-500">Nada para vos esta ronda.</p>}
+      {sinNada && <p className="text-zinc-500">Nada para ti esta ronda.</p>}
       <ul className="space-y-1 leading-tight">
         {misAtaques.map((h, i) => (
           <li key={`a${i}`} className="text-emerald-200">
@@ -379,6 +529,13 @@ function ItemRondaJugador({
           <li key={`r${i}`} className="text-red-300">
             💥 <strong>{h.atacanteNombre}</strong> te impactó en {coordLabel(h.fila, h.col)}
             {h.hundeBarco && " — y hundió uno de tus barcos"}
+          </li>
+        ))}
+        {hitsPublicos.map((h, i) => (
+          <li key={`p${i}`} className="text-zinc-300">
+            ⚔️ <strong>{h.atacanteNombre}</strong> le pegó a{" "}
+            <strong>{h.victimaNombre}</strong>
+            {h.hundeBarco && " — ¡y le hundió un barco!"}
           </li>
         ))}
         {misHerencias.map((h, i) => (
@@ -465,4 +622,3 @@ function FilasPodio({
     </div>
   );
 }
-
