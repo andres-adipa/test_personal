@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useRef, useState } from "react";
+import { type CSSProperties, use, useEffect, useRef, useState } from "react";
 import IdentidadForm, { useIdentidad } from "@/app/components/Identidad";
 import Tablero, { type BarcoVisible } from "@/app/battleship/components/Tablero";
 import BannerRevelado from "@/app/battleship/components/BannerRevelado";
@@ -31,12 +31,23 @@ type EventoHerencia = {
   celdasGanadas: number;
 };
 
+type EventoHitPublico = {
+  atacanteNombre: string;
+  victimaNombre: string;
+  hundeBarco: boolean;
+};
+
 type EventoRonda = {
   ronda: number;
   hits: EventoHit[];
   fails: { atacante: string; atacanteNombre: string; fila: number; col: number }[];
+  desperdicios?: { atacante: string; atacanteNombre: string }[];
   herencias: EventoHerencia[];
   eliminados: string[];
+  hitsPublicos?: EventoHitPublico[];
+  totalHits?: number;
+  totalFails?: number;
+  totalDesperdicios?: number;
 };
 
 type Estado = {
@@ -382,32 +393,57 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
                 <div className="mb-1 flex items-center justify-between">
                   <span className="font-semibold text-violet-300">Ronda {ev.ronda}</span>
                   <span className="text-zinc-500">
-                    {ev.hits.length} hit(s) · {ev.fails.length} fallo(s)
+                    {ev.totalHits ?? ev.hits.length} hit(s) ·{" "}
+                    {ev.totalFails ?? ev.fails.length} fallo(s)
                   </span>
                 </div>
-                {ev.hits.length === 0 ? (
-                  <p className="text-zinc-500">Sin hits esta ronda.</p>
-                ) : (
-                  <ul className="space-y-1">
-                    {ev.hits.map((h, i) => (
-                      <li
-                        key={i}
-                        className="battleship-fade-in leading-tight"
-                        style={{ animationDelay: `${i * 90}ms` }}
-                      >
-                        <span className="text-zinc-300">{h.atacanteNombre}</span>{" "}
-                        <span className="text-zinc-500">→</span>{" "}
-                        <span className="text-zinc-300">{h.victimaNombre}</span>{" "}
-                        <span className="text-zinc-500">{coordLabel(h.fila, h.col)}</span>
-                        {h.hundeBarco && (
-                          <span className="ml-1 rounded bg-red-900/60 px-1 text-[10px] text-red-200">
-                            HUNDIÓ
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                {(() => {
+                  const hitsPublicos = ev.hitsPublicos ?? [];
+                  let idx = 0;
+                  const fade = (): CSSProperties => ({
+                    animationDelay: `${idx++ * 90}ms`,
+                  });
+                  if (ev.hits.length === 0 && hitsPublicos.length === 0) {
+                    return <p className="text-zinc-500">Sin hits esta ronda.</p>;
+                  }
+                  return (
+                    <ul className="space-y-1">
+                      {ev.hits.map((h, i) => (
+                        <li
+                          key={`hp${i}`}
+                          className="battleship-fade-in leading-tight"
+                          style={fade()}
+                        >
+                          <span className="text-zinc-300">{h.atacanteNombre}</span>{" "}
+                          <span className="text-zinc-500">→</span>{" "}
+                          <span className="text-zinc-300">{h.victimaNombre}</span>{" "}
+                          <span className="text-zinc-500">{coordLabel(h.fila, h.col)}</span>
+                          {h.hundeBarco && (
+                            <span className="ml-1 rounded bg-red-900/60 px-1 text-[10px] text-red-200">
+                              HUNDIÓ
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                      {hitsPublicos.map((h, i) => (
+                        <li
+                          key={`hpu${i}`}
+                          className="battleship-fade-in leading-tight"
+                          style={fade()}
+                        >
+                          <span className="text-zinc-300">{h.atacanteNombre}</span>{" "}
+                          <span className="text-zinc-500">→</span>{" "}
+                          <span className="text-zinc-300">{h.victimaNombre}</span>
+                          {h.hundeBarco && (
+                            <span className="ml-1 rounded bg-red-900/60 px-1 text-[10px] text-red-200">
+                              HUNDIÓ
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
                 {(ev.herencias?.length ?? 0) > 0 && (
                   <ul className="mt-1 space-y-0.5">
                     {ev.herencias.map((h, i) => (
