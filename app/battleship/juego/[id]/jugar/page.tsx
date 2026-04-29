@@ -52,7 +52,7 @@ type Estado = {
   id: string;
   titulo: string;
   lider: string;
-  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean; densidad?: "denso" | "normal" | "tranquilo" };
+  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean; densidad?: "super_denso" | "denso" | "normal" | "tranquilo" };
   estado: "lobby" | "en_ronda" | "revelando" | "terminado";
   tablero: { ancho: number; alto: number } | null;
   rondaActual: number;
@@ -227,7 +227,12 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
   // Etapa visible (banner grande)
   const etapa = computarEtapa(data, now);
 
-  // ¿Soy ganador?
+  // ¿Soy ganador (único o en empate)?
+  const empatadosEmails = data.estado === "terminado"
+    ? podio.filter((p) => p.empate).map((p) => p.jugador.email)
+    : [];
+  const hayEmpate = empatadosEmails.length >= 2;
+  const yoSoyEmpatado = hayEmpate && empatadosEmails.includes(identidad.email);
   const yoSoyGanador =
     data.estado === "terminado" &&
     podio.length > 0 &&
@@ -293,8 +298,26 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
         </div>
       )}
 
-      {/* Banner de derrota cuando terminó y perdí */}
-      {data.estado === "terminado" && data.estoyEliminado && !yoSoyGanador && (
+      {/* Banner de empate */}
+      {data.estado === "terminado" && yoSoyEmpatado && (
+        <div className="mb-3 rounded-2xl border-2 border-amber-500 bg-gradient-to-br from-amber-900/70 via-amber-800/40 to-amber-950/60 p-5 text-center shadow-lg shadow-amber-900/40">
+          <div className="text-3xl">🤝</div>
+          <div className="mt-1 text-2xl font-extrabold uppercase tracking-wide text-amber-200">
+            Empate
+          </div>
+          <div className="mt-1 text-sm text-amber-300">
+            Caíste junto con{" "}
+            {empatadosEmails
+              .filter((e) => e !== identidad.email)
+              .map((e) => data.jugadores.find((p) => p.email === e)?.nombre ?? e)
+              .join(", ")}
+            {" "}en la ronda final.
+          </div>
+        </div>
+      )}
+
+      {/* Banner de derrota cuando terminó y perdí (no empatado) */}
+      {data.estado === "terminado" && data.estoyEliminado && !yoSoyGanador && !yoSoyEmpatado && (
         <div className="mb-3 rounded-2xl border-2 border-red-600 bg-gradient-to-br from-red-950/80 via-red-900/40 to-red-950/60 p-5 text-center shadow-lg shadow-red-900/40">
           <div className="text-3xl">🪦</div>
           <div className="mt-1 text-2xl font-extrabold uppercase tracking-wide text-red-200">
@@ -420,6 +443,7 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
                     evento={ev}
                     miEmail={identidad.email}
                     jugadores={data.jugadores}
+                    veTodo={data.esEspectador || data.estado === "terminado"}
                   />
                 ))}
               </div>
@@ -580,10 +604,12 @@ function ItemRondaJugador({
   evento,
   miEmail,
   jugadores,
+  veTodo,
 }: {
   evento: EventoRonda;
   miEmail: string;
   jugadores: { email: string; nombre: string; eliminado: boolean }[];
+  veTodo: boolean;
 }) {
   const misAtaques = evento.hits.filter((h) => h.atacante === miEmail);
   const golpesRecibidos = evento.hits.filter((h) => h.victima === miEmail);
@@ -594,6 +620,12 @@ function ItemRondaJugador({
     .join(", ");
 
   const misHerencias = evento.herencias ?? [];
+  // Hits ajenos a mostrar como "Otros enfrentamientos":
+  // - Si soy verTodo: ev.hits incluye TODOS, filtrar los que no son míos (con coords).
+  // - Si no: el server me manda hitsPublicos sin coords.
+  const hitsAjenosVerTodo = veTodo
+    ? evento.hits.filter((h) => h.atacante !== miEmail && h.victima !== miEmail)
+    : [];
   const hitsPublicos = evento.hitsPublicos ?? [];
   const misDesperdicios = (evento.desperdicios ?? []).filter(
     (d) => d.atacante === miEmail,
@@ -606,7 +638,8 @@ function ItemRondaJugador({
     evento.fails.length === 0 &&
     misDesperdicios === 0 &&
     misHerencias.length === 0 &&
-    hitsPublicos.length === 0;
+    hitsPublicos.length === 0 &&
+    hitsAjenosVerTodo.length === 0;
 
   // Indexador local de animación para que cada línea aparezca con delay
   let idx = 0;
@@ -670,12 +703,21 @@ function ItemRondaJugador({
         </>
       )}
 
-      {(hitsPublicos.length > 0 || otrosEliminados.length > 0) && (
+      {(hitsPublicos.length > 0 ||
+        hitsAjenosVerTodo.length > 0 ||
+        otrosEliminados.length > 0) && (
         <>
           <div className="mt-2 text-[10px] uppercase tracking-widest text-zinc-500">
             Otros enfrentamientos
           </div>
           <ul className="space-y-1 leading-tight">
+            {hitsAjenosVerTodo.map((h, i) => (
+              <li key={`v${i}`} className="battleship-fade-in text-zinc-300" style={fadeStyle()}>
+                ⚔️ <strong>{h.atacanteNombre}</strong> le pegó a{" "}
+                <strong>{h.victimaNombre}</strong> en {coordLabel(h.fila, h.col)}
+                {h.hundeBarco && " — ¡y le hundió un barco!"}
+              </li>
+            ))}
             {hitsPublicos.map((h, i) => (
               <li key={`p${i}`} className="battleship-fade-in text-zinc-300" style={fadeStyle()}>
                 ⚔️ <strong>{h.atacanteNombre}</strong> le pegó a{" "}
@@ -709,6 +751,29 @@ function PanelGanador({
       </div>
     );
   }
+  const empatados = podio.filter((p) => p.empate);
+  const hayEmpate = empatados.length >= 2;
+
+  if (hayEmpate) {
+    const yoEmpatado = empatados.some((e) => e.jugador.email === miEmail);
+    const nombres = empatados.map((e) => e.jugador.nombre).join(", ");
+    return (
+      <div className="rounded-lg border-2 border-amber-400 bg-gradient-to-br from-amber-900/70 via-amber-800/40 to-amber-950/60 p-4 shadow-lg shadow-amber-900/40">
+        <div className="text-center">
+          <div className="text-3xl">🤝</div>
+          <div className="mt-1 text-base font-extrabold uppercase tracking-wide text-amber-200">
+            {yoEmpatado ? "¡Empate!" : "Empate"}
+          </div>
+          <div className="mt-1 text-lg font-bold text-amber-100">{nombres}</div>
+          <div className="mt-1 text-xs text-amber-300/80">
+            Caída simultánea en la ronda final
+          </div>
+        </div>
+        <FilasPodio podio={podio} miEmail={miEmail} />
+      </div>
+    );
+  }
+
   const ganador = podio[0].jugador;
   const yoSoyGanador = ganador.email === miEmail && !ganador.eliminado;
   const titulo = yoSoyGanador ? "¡Ganaste!" : "Tenemos un ganador";

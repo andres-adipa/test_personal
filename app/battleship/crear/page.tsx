@@ -15,7 +15,7 @@ export default function CrearBattleshipPage() {
   const [robaInformacion, setRobaInformacion] = useState(false);
   const [liderJugador, setLiderJugador] = useState(false);
   const [autoLanzar, setAutoLanzar] = useState(true);
-  const [densidad, setDensidad] = useState<"denso" | "normal" | "tranquilo">("normal");
+  const [densidad, setDensidad] = useState<"super_denso" | "denso" | "normal" | "tranquilo">("normal");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,9 +104,17 @@ export default function CrearBattleshipPage() {
 
         <div>
           <label className="mb-1 block text-xs text-zinc-400">Densidad del mapa</label>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {(
               [
+                {
+                  v: "super_denso",
+                  titulo: "Super Denso",
+                  resumen: "40% del mapa con barcos",
+                  detalle: "Mapa muy chico, partidas exprés. Casi cualquier disparo conecta — caos total.",
+                  color: "border-fuchsia-500/70 bg-fuchsia-950/30 text-fuchsia-100",
+                  activo: "ring-2 ring-fuchsia-400",
+                },
                 {
                   v: "denso",
                   titulo: "Denso",

@@ -5,6 +5,7 @@ export type ItemPodio = {
   posicion: number;
   medalla: "🥇" | "🥈" | "🥉" | null;
   stats: StatsJugador;
+  empate?: boolean; // true cuando comparte primer puesto con otro(s)
 };
 
 const MEDALLAS = ["🥇", "🥈", "🥉"] as const;
@@ -38,10 +39,36 @@ export function calcularPodio(
     return sb.hits - sa.hits;
   });
 
-  return ordenado.slice(0, 3).map((j, i) => ({
-    jugador: j,
-    posicion: i + 1,
-    medalla: i < 3 ? MEDALLAS[i] : null,
-    stats: statsPorJugador.get(j.email) ?? { hits: 0, hundimientos: 0 },
-  }));
+  // Detectar empate en el primer puesto:
+  // - Si el primero está vivo, no hay empate (ganador único).
+  // - Si el primero está eliminado, son empate todos los eliminados que cayeron
+  //   en la misma ronda final.
+  const empatadosEmails = new Set<string>();
+  if (ordenado.length > 0) {
+    const primero = ordenado[0];
+    if (primero.eliminado) {
+      const rondaPrimero = cayoEnRonda.get(primero.email);
+      if (rondaPrimero !== undefined) {
+        for (const j of ordenado) {
+          if (j.eliminado && cayoEnRonda.get(j.email) === rondaPrimero) {
+            empatadosEmails.add(j.email);
+          } else {
+            break;
+          }
+        }
+      }
+    }
+  }
+  const hayEmpate = empatadosEmails.size >= 2;
+
+  return ordenado.slice(0, Math.max(3, empatadosEmails.size)).map((j, i) => {
+    const enEmpate = hayEmpate && empatadosEmails.has(j.email);
+    return {
+      jugador: j,
+      posicion: enEmpate ? 1 : i + 1,
+      medalla: enEmpate ? "🥇" : i < 3 ? MEDALLAS[i] : null,
+      stats: statsPorJugador.get(j.email) ?? { hits: 0, hundimientos: 0 },
+      empate: enEmpate,
+    };
+  });
 }

@@ -43,7 +43,7 @@ type Estado = {
   id: string;
   titulo: string;
   lider: string;
-  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean; densidad?: "denso" | "normal" | "tranquilo" };
+  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean; densidad?: "super_denso" | "denso" | "normal" | "tranquilo" };
   estado: "lobby" | "en_ronda" | "revelando" | "terminado";
   tablero: { ancho: number; alto: number } | null;
   rondaActual: number;
@@ -519,6 +519,8 @@ function PanelGanadorLider({ podio }: { podio: ItemPodio[] }) {
       </div>
     );
   }
+  const empatados = podio.filter((p) => p.empate);
+  const hayEmpate = empatados.length >= 2;
   const ganador = podio[0].jugador;
   const colorPos: Record<number, string> = {
     1: "border-amber-500/70 bg-amber-950/40 text-amber-100",
@@ -528,13 +530,20 @@ function PanelGanadorLider({ podio }: { podio: ItemPodio[] }) {
   return (
     <div className="rounded-lg border-2 border-amber-400 bg-gradient-to-br from-amber-900/70 via-amber-800/40 to-amber-950/60 p-4 shadow-lg shadow-amber-900/40">
       <div className="text-center">
-        <div className="text-3xl">🏆</div>
+        <div className="text-3xl">{hayEmpate ? "🤝" : "🏆"}</div>
         <div className="mt-1 text-base font-extrabold uppercase tracking-wide text-amber-200">
-          Solo queda un jugador
+          {hayEmpate ? "Empate" : "Solo queda un jugador"}
         </div>
         <div className="mt-1 text-lg font-bold text-amber-100">
-          {ganador.nombre} es el ganador
+          {hayEmpate
+            ? empatados.map((e) => e.jugador.nombre).join(", ")
+            : `${ganador.nombre} es el ganador`}
         </div>
+        {hayEmpate && (
+          <div className="mt-1 text-xs text-amber-300/80">
+            Caída simultánea en la ronda final
+          </div>
+        )}
       </div>
       <div className="mt-3 space-y-1 text-xs">
         {podio.map((it) => (

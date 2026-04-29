@@ -7,6 +7,7 @@ const PROPORCION = 4 / 5;
 // Densidad = celdas con barco / celdas totales. Lineal, no escalada por
 // cantidad de jugadores. El líder elige el preset al crear la sala.
 const DENSIDAD: Record<DensidadMapa, number> = {
+  super_denso: 0.40,
   denso: 0.30,
   normal: 0.22,
   tranquilo: 0.15,

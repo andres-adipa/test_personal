@@ -96,7 +96,7 @@ export type EventoRonda = {
   totalDesperdicios?: number;
 };
 
-export type DensidadMapa = "denso" | "normal" | "tranquilo";
+export type DensidadMapa = "super_denso" | "denso" | "normal" | "tranquilo";
 
 export type ConfigJuego = {
   barcosPorJugador: number;

@@ -28,8 +28,10 @@ export async function POST(req: NextRequest) {
   const liderJugador = body.liderJugador === true;
   const autoLanzar = body.autoLanzar === true;
   const densidadCruda = String(body.densidad ?? "normal");
-  const densidad: DensidadMapa =
-    densidadCruda === "denso" || densidadCruda === "tranquilo" ? densidadCruda : "normal";
+  const densidadValidas: DensidadMapa[] = ["super_denso", "denso", "normal", "tranquilo"];
+  const densidad: DensidadMapa = densidadValidas.includes(densidadCruda as DensidadMapa)
+    ? (densidadCruda as DensidadMapa)
+    : "normal";
 
   if (!titulo || !lider) {
     return NextResponse.json({ error: "Título y email del líder son obligatorios" }, { status: 400 });

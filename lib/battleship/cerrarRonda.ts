@@ -14,7 +14,11 @@ export function cerrarRondaEnMemoria(j: Juego): { todosBarcosHundidos: boolean }
   const ronda = j.rondaActual;
   const bombasRonda = j.bombas.filter((b) => b.ronda === ronda);
 
-  const celdasYaImpactadas = new Set(j.hits.map((h) => `${h.fila},${h.col}`));
+  // Celdas impactadas ANTES de esta ronda (fijo). Disparar acá = desperdicio.
+  const celdasImpactadasAntes = new Set(j.hits.map((h) => `${h.fila},${h.col}`));
+  // Celdas impactadas DURANTE esta ronda (crece). No son desperdicio: dos
+  // jugadores pudieron tirar a la misma celda en simultáneo.
+  const celdasYaImpactadas = new Set(celdasImpactadasAntes);
 
   const celdaABarco = new Map<string, string>();
   for (const barco of j.barcos) {
@@ -37,8 +41,8 @@ export function cerrarRondaEnMemoria(j: Juego): { todosBarcosHundidos: boolean }
       if (!atacanteJug.conocidas.includes(key)) atacanteJug.conocidas.push(key);
     }
 
-    if (celdasYaImpactadas.has(key)) {
-      // Disparo desperdiciado: celda ya impactada en una ronda anterior
+    // Desperdicio real: la celda ya estaba impactada en una RONDA PREVIA
+    if (celdasImpactadasAntes.has(key)) {
       const atacante = j.jugadores.find((p) => p.email === bomba.email);
       desperdiciosEvento.push({
         atacante: bomba.email,
@@ -46,9 +50,14 @@ export function cerrarRondaEnMemoria(j: Juego): { todosBarcosHundidos: boolean }
       });
       continue;
     }
+
     const barcoId = celdaABarco.get(key) ?? null;
-    j.hits.push({ fila: bomba.fila, col: bomba.col, ronda, barcoId });
-    celdasYaImpactadas.add(key);
+    // Sólo registrar hit en j.hits una vez por celda (evita duplicados cuando
+    // dos jugadores caen en la misma celda esta ronda).
+    if (!celdasYaImpactadas.has(key)) {
+      j.hits.push({ fila: bomba.fila, col: bomba.col, ronda, barcoId });
+      celdasYaImpactadas.add(key);
+    }
 
     if (!barcoId) {
       const atacante = j.jugadores.find((p) => p.email === bomba.email);
