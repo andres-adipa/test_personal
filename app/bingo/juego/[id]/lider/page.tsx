@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Carton from "@/app/components/Carton";
 import { useIdentidad } from "@/app/components/Identidad";
 import type { Cuadricula, Patron, EstadoJuego } from "@/lib/types";
 import { PATRONES } from "@/lib/patrones";
+
+type OrdenHistorial = "aparicion" | "numero";
 
 type Estado = {
   id: string;
@@ -25,6 +27,7 @@ type Estado = {
     numeros: Cuadricula;
   }[];
   sorteos: { numero: number; orden: number; cantadoAt: number }[];
+  numerosNoCantados: number[];
   marcas: { cartonId: string; numero: number; marcadoAt: number }[];
   bingos: {
     cartonId: string;
@@ -34,7 +37,7 @@ type Estado = {
     cantadoAt: number;
     patron: Patron;
   }[];
-  ganadores: { patron: Patron; cartonId: string; email: string; cantadoAt: number }[];
+  ganadores: { patron: Patron; cartonId: string; email: string; cantadoAt: number; indiceActualGanado: number }[];
   esLider: boolean;
 };
 
@@ -54,82 +57,148 @@ function fmtHora(ts: number) {
 export default function LiderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [identidad, , cargado] = useIdentidad();
+  const miEmail = identidad.email;
   const [data, setData] = useState<Estado | null>(null);
   const [error, setError] = useState("");
-  const [cantando, setCantando] = useState(false);
+  const [cantandoPendiente, setCantandoPendiente] = useState(false);
+  const [iniciando, setIniciando] = useState(false);
+  const [terminando, setTerminando] = useState(false);
+  const [reiniciando, setReiniciando] = useState(false);
+  const [ordenHistorial, setOrdenHistorial] = useState<OrdenHistorial>("aparicion");
+  const ultimoJsonRef = useRef<string>("");
+  const targetCountRef = useRef<number | null>(null);
+
+  const refetch = useCallback(async () => {
+    if (!miEmail) return;
+    try {
+      const r = await fetch(`/api/bingo/juegos/${id}?email=${encodeURIComponent(miEmail)}`);
+      if (!r.ok) return;
+      const texto = await r.text();
+      if (texto === ultimoJsonRef.current) return;
+      ultimoJsonRef.current = texto;
+      setData(JSON.parse(texto));
+    } catch {}
+  }, [id, miEmail]);
 
   useEffect(() => {
-    if (!cargado || !identidad.email) return;
-    const tick = async () => {
-      try {
-        const r = await fetch(`/api/bingo/juegos/${id}?email=${encodeURIComponent(identidad.email)}`);
-        if (!r.ok) return;
-        const j = await r.json();
-        setData(j);
-      } catch {}
-    };
-    tick();
-    const t = setInterval(tick, 1000);
+    if (!cargado || !miEmail) return;
+    refetch();
+    const t = setInterval(refetch, 1000);
     return () => clearInterval(t);
-  }, [id, identidad.email, cargado]);
+  }, [cargado, miEmail, refetch]);
+
+  const historialOrdenado = useMemo(() => {
+    const copy = (data?.sorteos ?? []).slice();
+    if (ordenHistorial === "numero") copy.sort((a, b) => a.numero - b.numero);
+    else copy.sort((a, b) => b.orden - a.orden);
+    return copy;
+  }, [data, ordenHistorial]);
+
+  const ultimoPremioGanado = useMemo(() => {
+    if (!data || data.patrones.length === 0) return false;
+    const ultimo = data.patrones[data.patrones.length - 1];
+    return data.ganadores.some((g) => g.patron === ultimo);
+  }, [data]);
 
   const jugadoresConEstado = useMemo(() => {
     if (!data) return [];
     return data.jugadores.map((p) => {
-      const elegidos = data.cartones.filter((c) => c.jugadorEmail === p.email && c.elegido).length;
+      const elegidos = data.cartones.filter(
+        (c) => c.jugadorEmail === p.email && c.elegido,
+      ).length;
       return { ...p, elegidos, listo: elegidos === data.cartonesPorJugador };
     });
   }, [data]);
 
   const todosListos =
-    !!data &&
-    data.jugadores.length > 0 &&
-    jugadoresConEstado.every((j) => j.listo);
+    !!data && data.jugadores.length > 0 && jugadoresConEstado.every((j) => j.listo);
 
   const iniciar = async () => {
+    if (iniciando) return;
     setError("");
-    const r = await fetch(`/api/bingo/juegos/${id}/iniciar`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: identidad.email }),
-    });
-    if (!r.ok) {
-      const e = await r.json();
-      setError(e.error ?? "Error");
+    setIniciando(true);
+    try {
+      const r = await fetch(`/api/bingo/juegos/${id}/iniciar`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: miEmail }),
+      });
+      if (!r.ok) {
+        const e = await r.json();
+        setError(e.error ?? "Error");
+      }
+      await refetch();
+    } finally {
+      setIniciando(false);
     }
   };
 
   const cantar = async () => {
-    if (!data || data.estado !== "en_curso" || cantando) return;
-    setCantando(true);
-    await fetch(`/api/bingo/juegos/${id}/cantar`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: identidad.email }),
-    });
-    setTimeout(() => setCantando(false), 300);
+    if (!data || data.estado !== "en_curso" || cantandoPendiente) return;
+    targetCountRef.current = data.sorteos.length + 1;
+    setCantandoPendiente(true);
+    try {
+      await fetch(`/api/bingo/juegos/${id}/cantar`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: miEmail }),
+      });
+      await refetch();
+    } catch {}
   };
 
+  // Libera el spinner cuando data refleja el nuevo sorteo (con safety timeout).
+  useEffect(() => {
+    if (!cantandoPendiente) return;
+    const target = targetCountRef.current;
+    if (data && target !== null && data.sorteos.length >= target) {
+      targetCountRef.current = null;
+      setCantandoPendiente(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      targetCountRef.current = null;
+      setCantandoPendiente(false);
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [cantandoPendiente, data]);
+
+  const cantando = cantandoPendiente;
+
   const reiniciar = async () => {
+    if (reiniciando) return;
     if (!confirm("¿Reiniciar el juego? Se regenerarán todos los cartones.")) return;
-    await fetch(`/api/bingo/juegos/${id}/reiniciar`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: identidad.email }),
-    });
+    setReiniciando(true);
+    try {
+      await fetch(`/api/bingo/juegos/${id}/reiniciar`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: miEmail }),
+      });
+      await refetch();
+    } finally {
+      setReiniciando(false);
+    }
   };
 
   const terminar = async () => {
+    if (terminando) return;
     if (!confirm("¿Terminar el juego? Se cerrará la posibilidad de empate del último premio.")) return;
-    await fetch(`/api/bingo/juegos/${id}/terminar`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: identidad.email }),
-    });
+    setTerminando(true);
+    try {
+      await fetch(`/api/bingo/juegos/${id}/terminar`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: miEmail }),
+      });
+      await refetch();
+    } finally {
+      setTerminando(false);
+    }
   };
 
   if (!cargado) return null;
-  if (!identidad.email) {
+  if (!miEmail) {
     return (
       <main className="mx-auto max-w-xl px-6 py-12 text-center">
         <p className="text-zinc-300">
@@ -161,9 +230,6 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
 
   const ultimoCantado =
     data.sorteos.length > 0 ? data.sorteos[data.sorteos.length - 1].numero : null;
-  const todosLosPremiosGanados =
-    data.patrones.length > 0 &&
-    data.patrones.every((p) => data.ganadores.some((g) => g.patron === p));
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
@@ -185,9 +251,10 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
           <button
             type="button"
             onClick={reiniciar}
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-300 transition-colors hover:border-rose-500 hover:text-rose-300"
+            disabled={reiniciando}
+            className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-300 transition-colors hover:border-rose-500 hover:text-rose-300 active:scale-95 disabled:opacity-50"
           >
-            Reiniciar
+            {reiniciando ? "Reiniciando..." : "Reiniciar"}
           </button>
         </div>
       </div>
@@ -198,7 +265,6 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
-      {/* Lista de jugadores */}
       <section className="mb-4 rounded-xl border border-zinc-700 bg-zinc-800 p-4">
         <h2 className="mb-3 border-l-2 border-violet-500 pl-3 text-sm font-semibold text-zinc-200">
           Jugadores ({jugadoresConEstado.length})
@@ -208,7 +274,10 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
         ) : (
           <ul className="space-y-1.5 text-sm">
             {jugadoresConEstado.map((p) => (
-              <li key={p.email} className="flex items-center justify-between rounded-lg bg-zinc-900/40 px-3 py-2">
+              <li
+                key={p.email}
+                className="flex items-center justify-between rounded-lg bg-zinc-900/40 px-3 py-2"
+              >
                 <span className="text-zinc-200">
                   {p.nombre} <span className="text-xs text-zinc-500">· {p.email}</span>
                 </span>
@@ -229,18 +298,19 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
         )}
       </section>
 
-      {/* Control según estado */}
       {data.estado !== "en_curso" && data.estado !== "terminado" && (
         <section className="mb-6 rounded-xl border border-zinc-700 bg-zinc-800 p-5">
           <button
             type="button"
             onClick={iniciar}
-            disabled={!todosListos}
-            className="w-full rounded-lg border border-violet-600 bg-violet-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-violet-500 disabled:opacity-40"
+            disabled={!todosListos || iniciando}
+            className="w-full rounded-lg border border-violet-600 bg-violet-600 px-6 py-3 text-base font-semibold text-white transition-all duration-150 hover:bg-violet-500 active:scale-[0.98] disabled:opacity-40"
           >
-            {todosListos
-              ? "Iniciar juego"
-              : "Esperando que todos los jugadores elijan sus cartones..."}
+            {iniciando
+              ? "Iniciando..."
+              : todosListos
+                ? "Iniciar juego"
+                : "Esperando que todos los jugadores elijan sus cartones..."}
           </button>
         </section>
       )}
@@ -250,35 +320,66 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
           <section className="mb-4 grid gap-4 sm:grid-cols-[1fr_auto]">
             <div className="rounded-xl border border-zinc-700 bg-zinc-800 p-5">
               <div className="mb-2 text-xs text-zinc-400">Número actual</div>
-              {ultimoCantado !== null ? (
-                <div className="inline-flex h-28 w-28 items-center justify-center rounded-full bg-amber-500 text-5xl font-bold text-zinc-900 shadow-lg">
+              {cantando ? (
+                <div className="inline-flex h-28 w-28 items-center justify-center rounded-full bg-amber-500/30 text-amber-200 shadow-lg ring-2 ring-amber-400/60 animate-pulse">
+                  <svg className="h-10 w-10 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="12" r="10" className="opacity-25" />
+                    <path d="M4 12a8 8 0 018-8" className="opacity-90" strokeLinecap="round" />
+                  </svg>
+                </div>
+              ) : ultimoCantado !== null ? (
+                <div
+                  key={ultimoCantado}
+                  className="inline-flex h-28 w-28 items-center justify-center rounded-full bg-amber-500 text-5xl font-bold text-zinc-900 shadow-lg"
+                >
                   {ultimoCantado}
                 </div>
               ) : (
                 <div className="text-sm text-zinc-500">Aún no has cantado ningún número</div>
               )}
               <div className="mt-3 text-xs text-zinc-400">
-                {data.cantadosCount}/99 números cantados
+                {data.cantadosCount}/90 números cantados
               </div>
             </div>
             <div className="flex items-stretch">
               {data.estado === "en_curso" ? (
-                todosLosPremiosGanados ? (
+                ultimoPremioGanado ? (
                   <button
                     type="button"
                     onClick={terminar}
-                    className="rounded-xl border border-rose-600 bg-rose-600 px-10 py-8 text-2xl font-bold text-white transition-transform hover:scale-105 hover:bg-rose-500"
+                    disabled={terminando}
+                    className="flex min-h-[7.5rem] min-w-[13rem] items-center justify-center rounded-xl border border-rose-600 bg-rose-600 px-10 py-8 text-2xl font-bold text-white transition-all duration-150 hover:scale-105 hover:bg-rose-500 active:scale-95 disabled:opacity-60"
                   >
-                    Terminar<br />juego
+                    {terminando ? (
+                      <span className="flex flex-col items-center gap-1">
+                        <svg className="h-7 w-7 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <circle cx="12" cy="12" r="10" className="opacity-25" />
+                          <path d="M4 12a8 8 0 018-8" strokeLinecap="round" />
+                        </svg>
+                        <span className="text-base">Terminando...</span>
+                      </span>
+                    ) : (
+                      <span className="text-center leading-tight">Terminar<br />juego</span>
+                    )}
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={cantar}
-                    disabled={cantando || data.cantadosCount >= 99}
-                    className="rounded-xl border border-violet-600 bg-violet-600 px-10 py-8 text-2xl font-bold text-white transition-transform hover:scale-105 hover:bg-violet-500 disabled:opacity-40"
+                    disabled={cantando || data.cantadosCount >= 90}
+                    className="flex min-h-[7.5rem] min-w-[13rem] items-center justify-center rounded-xl border border-violet-600 bg-violet-600 px-10 py-8 text-2xl font-bold text-white transition-all duration-150 hover:scale-105 hover:bg-violet-500 active:scale-95 disabled:opacity-60"
                   >
-                    Cantar<br />siguiente
+                    {cantando ? (
+                      <span className="flex flex-col items-center gap-1">
+                        <svg className="h-7 w-7 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <circle cx="12" cy="12" r="10" className="opacity-25" />
+                          <path d="M4 12a8 8 0 018-8" strokeLinecap="round" />
+                        </svg>
+                        <span className="text-base">Cantando...</span>
+                      </span>
+                    ) : (
+                      <span className="text-center leading-tight">Cantar<br />siguiente</span>
+                    )}
                   </button>
                 )
               ) : (
@@ -294,30 +395,74 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
             </div>
           </section>
 
+          {data.estado === "terminado" && data.numerosNoCantados && data.numerosNoCantados.length > 0 && (
+            <section className="mb-4 rounded-xl border border-zinc-700 bg-zinc-800 p-4">
+              <h2 className="mb-3 border-l-2 border-violet-500 pl-3 text-sm font-semibold text-zinc-200">
+                Números no cantados ({data.numerosNoCantados.length}){" "}
+                <span className="ml-2 text-xs font-normal text-zinc-500">
+                  en el orden en que hubieran salido
+                </span>
+              </h2>
+              <div className="flex flex-wrap gap-1.5">
+                {data.numerosNoCantados.map((n, i) => (
+                  <span
+                    key={i}
+                    className="rounded bg-zinc-900/60 px-2 py-1 text-xs text-zinc-400 border border-zinc-800"
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="mb-4 rounded-xl border border-zinc-700 bg-zinc-800 p-4">
             <h2 className="mb-3 border-l-2 border-violet-500 pl-3 text-sm font-semibold text-zinc-200">
               Premios y ganadores
             </h2>
             <ul className="space-y-1.5 text-sm">
               {data.patrones.map((p) => {
-                const g = data.ganadores.find((x) => x.patron === p);
-                const nombre = g
-                  ? data.jugadores.find((j) => j.email === g.email)?.nombre ?? g.email
-                  : null;
+                const gs = data.ganadores
+                  .filter((x) => x.patron === p)
+                  .sort((a, b) => a.cantadoAt - b.cantadoAt);
+                const ventanaAbierta =
+                  gs.length > 0 &&
+                  gs[0].indiceActualGanado === data.indiceActual &&
+                  data.estado === "en_curso";
                 return (
                   <li
                     key={p}
-                    className={`flex items-center justify-between rounded-lg px-3 py-2 ${
-                      g ? "bg-emerald-900/30" : "bg-zinc-900/40"
+                    className={`rounded-lg px-3 py-2 ${
+                      gs.length > 0 ? "bg-emerald-900/30" : "bg-zinc-900/40"
                     }`}
                   >
-                    <span className="text-zinc-200">{patronLabel(p)}</span>
-                    {g ? (
-                      <span className="text-xs text-emerald-300">
-                        ✓ {nombre} · {fmtHora(g.cantadoAt)}
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-200">
+                        {patronLabel(p)}
+                        {ventanaAbierta && (
+                          <span className="ml-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                            Empate abierto
+                          </span>
+                        )}
                       </span>
-                    ) : (
-                      <span className="text-xs text-zinc-500">Pendiente</span>
+                      {gs.length === 0 && (
+                        <span className="text-xs text-zinc-500">Pendiente</span>
+                      )}
+                    </div>
+                    {gs.length > 0 && (
+                      <ul className="mt-1 space-y-0.5 pl-3 text-xs text-emerald-200">
+                        {gs.map((g, i) => {
+                          const nombre =
+                            data.jugadores.find((j) => j.email === g.email)?.nombre ??
+                            g.email;
+                          return (
+                            <li key={i}>
+                              {i + 1}. {nombre}{" "}
+                              <span className="text-emerald-400">({fmtHora(g.cantadoAt)})</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     )}
                   </li>
                 );
@@ -327,25 +472,40 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
 
           {data.sorteos.length > 0 && (
             <section className="mb-4 rounded-xl border border-zinc-700 bg-zinc-800 p-4">
-              <h2 className="mb-3 border-l-2 border-violet-500 pl-3 text-sm font-semibold text-zinc-200">
-                Historial (más recientes primero)
-              </h2>
-              <div className="flex flex-wrap gap-1.5">
-                {data.sorteos
-                  .slice()
-                  .reverse()
-                  .map((s, i) => (
-                    <span
-                      key={s.orden}
-                      className={`rounded px-2 py-1 text-xs ${
-                        i === 0
-                          ? "bg-amber-500 text-zinc-900 font-bold"
-                          : "bg-zinc-900 text-zinc-300"
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="border-l-2 border-violet-500 pl-3 text-sm font-semibold text-zinc-200">
+                  Historial de números cantados
+                </h2>
+                <div className="flex overflow-hidden rounded-lg border border-zinc-700">
+                  {(["aparicion", "numero"] as OrdenHistorial[]).map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => setOrdenHistorial(o)}
+                      className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                        ordenHistorial === o
+                          ? "bg-violet-600 text-white"
+                          : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
                       }`}
                     >
-                      {s.numero}
-                    </span>
+                      {o === "aparicion" ? "Por aparición" : "Por número"}
+                    </button>
                   ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {historialOrdenado.map((s) => (
+                  <span
+                    key={s.orden}
+                    className={`rounded px-2 py-1 text-xs ${
+                      s.numero === ultimoCantado
+                        ? "bg-amber-500 text-zinc-900 font-bold"
+                        : "bg-zinc-900 text-zinc-300"
+                    }`}
+                  >
+                    {s.numero}
+                  </span>
+                ))}
               </div>
             </section>
           )}
@@ -360,7 +520,8 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
                   .slice()
                   .reverse()
                   .map((b, i) => {
-                    const nombre = data.jugadores.find((p) => p.email === b.email)?.nombre ?? b.email;
+                    const nombre =
+                      data.jugadores.find((p) => p.email === b.email)?.nombre ?? b.email;
                     return (
                       <li
                         key={i}
@@ -387,7 +548,6 @@ export default function LiderPage({ params }: { params: Promise<{ id: string }> 
             </section>
           )}
 
-          {/* Cartones de los jugadores, con marcas visibles para auditoría */}
           <section className="rounded-xl border border-zinc-700 bg-zinc-800 p-4">
             <h2 className="mb-3 border-l-2 border-violet-500 pl-3 text-sm font-semibold text-zinc-200">
               Cartones de los jugadores

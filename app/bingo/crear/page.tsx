@@ -14,7 +14,8 @@ export default function CrearPage() {
   const [patrones, setPatrones] = useState<Patron[]>(["linea"]);
   const [cartonesPorJugador, setCartones] = useState<1 | 2>(1);
   const [mostrarPatron, setMostrarPatron] = useState(false);
-  const [historialVisibleJugador, setHistorialVisible] = useState(true);
+  const [historialVisibleJugador, setHistorialVisible] = useState(false);
+  const [avisarNumerosPasados, setAvisarNumerosPasados] = useState(false);
   const [error, setError] = useState("");
   const [creando, setCreando] = useState(false);
 
@@ -62,6 +63,7 @@ export default function CrearPage() {
         cartonesPorJugador,
         mostrarPatron,
         historialVisibleJugador,
+        avisarNumerosPasados,
       }),
     });
     const data = await res.json();
@@ -179,6 +181,17 @@ export default function CrearPage() {
             className="h-4 w-4 accent-violet-500"
           />
           Permitir que los jugadores vean el historial de números cantados
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={avisarNumerosPasados}
+            onChange={(e) => setAvisarNumerosPasados(e.target.checked)}
+            className="h-4 w-4 accent-violet-500"
+          />
+          Avisar al jugador si pasó por alto un número de su cartón (lo marca en
+          rojo)
         </label>
 
         {error && <p className="text-sm text-rose-400">{error}</p>}

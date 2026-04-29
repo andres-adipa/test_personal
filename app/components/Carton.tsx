@@ -6,6 +6,7 @@ import { celdasDelPatron } from "@/lib/patrones";
 type Props = {
   numeros: Cuadricula;
   marcados?: Set<number>;
+  cantados?: Set<number>;
   patronResaltado?: Patron | null;
   onClickNumero?: (n: number) => void;
   compacto?: boolean;
@@ -14,6 +15,7 @@ type Props = {
 export default function Carton({
   numeros,
   marcados,
+  cantados,
   patronResaltado,
   onClickNumero,
   compacto,
@@ -35,19 +37,22 @@ export default function Carton({
               );
             }
             const marcado = marcados?.has(cell);
+            const cantadoNoMarcado = !marcado && cantados?.has(cell);
             const enPatron = mask?.[f]?.[c];
             let bg = "bg-zinc-700";
             if (clickable) bg += " hover:bg-zinc-600";
             if (marcado) bg = clickable ? "bg-violet-600 hover:bg-violet-500 text-white" : "bg-violet-600 text-white";
+            if (cantadoNoMarcado) bg = clickable ? "bg-rose-500/20 text-rose-300 hover:bg-rose-500/30" : "bg-rose-500/20 text-rose-300";
             const ring = enPatron && !marcado ? "ring-1 ring-violet-400/60" : "";
-            const cls = `${celdaBase} rounded font-semibold transition-colors ${bg} ${ring} flex items-center justify-center select-none`;
+            const cls = `${celdaBase} rounded font-semibold transition-all duration-100 ${bg} ${ring} flex items-center justify-center select-none`;
             if (clickable) {
               return (
                 <button
                   key={`${f}-${c}`}
                   type="button"
                   onClick={() => onClickNumero?.(cell)}
-                  className={`${cls} cursor-pointer`}
+                  className={`${cls} cursor-pointer touch-manipulation active:scale-90`}
+                  style={{ WebkitTapHighlightColor: "transparent" }}
                 >
                   {cell}
                 </button>

@@ -18,8 +18,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!j.patrones.includes(patron)) {
     return NextResponse.json({ error: "Ese premio no aplica a este juego" }, { status: 400 });
   }
-  if (j.ganadores.some((g) => g.patron === patron)) {
-    return NextResponse.json({ error: "Ese premio ya fue ganado" }, { status: 400 });
+  // Ventana de empate: un premio queda cerrado solo cuando el líder avanza de
+  // número. Mientras `indiceActual` sea el mismo en que se cantó, otros jugadores
+  // pueden ganar el mismo premio.
+  const ganadoresPatron = j.ganadores.filter((g) => g.patron === patron);
+  if (ganadoresPatron.length > 0) {
+    const primer = ganadoresPatron[0];
+    const indicePrimer = primer.indiceActualGanado ?? -1;
+    if (j.indiceActual !== indicePrimer) {
+      return NextResponse.json({ error: "Ese premio ya fue cerrado" }, { status: 400 });
+    }
+    if (ganadoresPatron.some((g) => g.email === email)) {
+      return NextResponse.json({ error: "Ya cantaste este premio" }, { status: 400 });
+    }
   }
 
   const carton = j.cartones.find((c) => c.id === cartonId);
@@ -56,12 +67,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   if (valido) {
-    j.ganadores.push({ patron, cartonId, email, cantadoAt: ahora });
-    // Si todos los premios ya tienen ganador, se termina.
-    if (j.ganadores.length >= j.patrones.length) {
-      j.estado = "terminado";
-      j.endedAt = ahora;
-    }
+    j.ganadores.push({
+      patron,
+      cartonId,
+      email,
+      cantadoAt: ahora,
+      indiceActualGanado: j.indiceActual,
+    });
+    // No auto-terminate: el juego sigue para permitir empates. El líder cierra
+    // con "Terminar juego" cuando corresponda.
   }
 
   await setJuego(j);

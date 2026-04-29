@@ -48,6 +48,7 @@ export type GanadorDePatron = {
   cartonId: string;
   email: string;
   cantadoAt: number;
+  indiceActualGanado: number;
 };
 
 export type Juego = {
@@ -58,6 +59,7 @@ export type Juego = {
   patrones: Patron[]; // múltiples premios en una partida, en orden
   mostrarPatron: boolean;
   historialVisibleJugador: boolean;
+  avisarNumerosPasados: boolean;
   estado: EstadoJuego;
   numerosBarajados: number[];
   indiceActual: number;

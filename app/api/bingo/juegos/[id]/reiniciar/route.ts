@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJuego, setJuego, barajar99 } from "@/lib/store";
+import { getJuego, setJuego, barajar90 } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   j.bingos = [];
   j.ganadores = [];
   j.indiceActual = -1;
-  j.numerosBarajados = barajar99();
+  j.numerosBarajados = barajar90();
   j.estado = "lobby";
   j.startedAt = null;
   j.endedAt = null;

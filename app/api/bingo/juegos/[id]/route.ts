@@ -25,6 +25,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const sorteosVisibles =
     !esLider && !j.historialVisibleJugador ? j.sorteos.slice(-1) : j.sorteos;
 
+  // Sólo exponemos los números no cantados cuando el juego terminó.
+  const numerosNoCantados =
+    j.estado === "terminado" ? j.numerosBarajados.slice(j.indiceActual + 1) : [];
+
   return NextResponse.json({
     id: j.id,
     titulo: j.titulo,
@@ -32,6 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     patrones: j.patrones,
     mostrarPatron: j.mostrarPatron,
     historialVisibleJugador: j.historialVisibleJugador,
+    avisarNumerosPasados: !!j.avisarNumerosPasados,
     cartonesPorJugador: j.cartonesPorJugador,
     estado: j.estado,
     indiceActual: j.indiceActual,
@@ -39,6 +44,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     jugadores: j.jugadores,
     cartones,
     sorteos: sorteosVisibles,
+    numerosNoCantados,
     bingos: j.bingos,
     ganadores: j.ganadores,
     startedAt: j.startedAt,

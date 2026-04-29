@@ -49,9 +49,9 @@ export function nuevoId(prefix = ""): string {
   return prefix + Math.random().toString(36).slice(2, 10);
 }
 
-export function barajar99(): number[] {
+export function barajar90(): number[] {
   const a: number[] = [];
-  for (let i = 1; i <= 99; i++) a.push(i);
+  for (let i = 1; i <= 90; i++) a.push(i);
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];

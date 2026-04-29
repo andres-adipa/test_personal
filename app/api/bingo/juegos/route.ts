@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listarJuegos, setJuego, nuevoId, barajar99 } from "@/lib/store";
+import { listarJuegos, setJuego, nuevoId, barajar90 } from "@/lib/store";
 import type { Juego, Patron } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
   const patronesInput = Array.isArray(body.patrones) ? body.patrones : [];
   const cartonesPorJugador = body.cartonesPorJugador === 2 ? 2 : 1;
   const mostrarPatron = !!body.mostrarPatron;
-  const historialVisibleJugador = body.historialVisibleJugador !== false;
+  const historialVisibleJugador = !!body.historialVisibleJugador;
+  const avisarNumerosPasados = !!body.avisarNumerosPasados;
 
   if (!titulo || !lider) {
     return NextResponse.json({ error: "Título y líder son obligatorios" }, { status: 400 });
@@ -62,8 +63,9 @@ export async function POST(req: NextRequest) {
     patrones,
     mostrarPatron,
     historialVisibleJugador,
+    avisarNumerosPasados,
     estado: "lobby",
-    numerosBarajados: barajar99(),
+    numerosBarajados: barajar90(),
     indiceActual: -1,
     jugadores: [],
     cartones: [],

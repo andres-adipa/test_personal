@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Carton from "@/app/components/Carton";
 import { useIdentidad } from "@/app/components/Identidad";
 import type { Cuadricula, Patron, EstadoJuego } from "@/lib/types";
-import { PATRONES } from "@/lib/patrones";
+import { PATRONES, chequearPatron, chequearDosCartonesLlenos } from "@/lib/patrones";
+
+type OrdenHistorial = "aparicion" | "numero";
 
 type Estado = {
   id: string;
@@ -14,6 +16,7 @@ type Estado = {
   patrones: Patron[];
   mostrarPatron: boolean;
   historialVisibleJugador: boolean;
+  avisarNumerosPasados: boolean;
   cartonesPorJugador: 1 | 2;
   estado: EstadoJuego;
   indiceActual: number;
@@ -27,9 +30,10 @@ type Estado = {
     numeros: Cuadricula;
   }[];
   sorteos: { numero: number; orden: number; cantadoAt: number }[];
+  numerosNoCantados: number[];
   marcas: { cartonId: string; numero: number; marcadoAt: number }[];
   bingos: { cartonId: string; email: string; valido: boolean; faltantes: number; cantadoAt: number; patron: Patron }[];
-  ganadores: { patron: Patron; cartonId: string; email: string; cantadoAt: number }[];
+  ganadores: { patron: Patron; cartonId: string; email: string; cantadoAt: number; indiceActualGanado: number }[];
   esLider: boolean;
 };
 
@@ -53,6 +57,7 @@ function fmtHora(ts: number) {
 export default function JugarPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [identidad, , cargado] = useIdentidad();
+  const miEmail = identidad.email;
   const [data, setData] = useState<Estado | null>(null);
   const [seleccion, setSeleccion] = useState<string[]>([]);
   const [resultadoBingo, setResultadoBingo] = useState<{
@@ -61,32 +66,42 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
     patron: Patron;
   } | null>(null);
   const [mensajeUnion, setMensajeUnion] = useState("");
+  const [ordenHistorial, setOrdenHistorial] = useState<OrdenHistorial>("aparicion");
+  const ultimoJsonRef = useRef<string>("");
+  // Marcas optimistas: lo que el usuario tocó y aún no confirma el servidor.
+  const [marcasOpt, setMarcasOpt] = useState<
+    Map<string, { add: Set<number>; remove: Set<number> }>
+  >(new Map());
+
+  const refetch = useCallback(async () => {
+    if (!miEmail) return;
+    try {
+      const r = await fetch(`/api/bingo/juegos/${id}?email=${encodeURIComponent(miEmail)}`);
+      if (!r.ok) return;
+      const texto = await r.text();
+      if (texto === ultimoJsonRef.current) return;
+      ultimoJsonRef.current = texto;
+      setData(JSON.parse(texto));
+    } catch {}
+  }, [id, miEmail]);
 
   useEffect(() => {
-    if (!cargado || !identidad.email) return;
-    const tick = async () => {
-      try {
-        const r = await fetch(`/api/bingo/juegos/${id}?email=${encodeURIComponent(identidad.email)}`);
-        if (!r.ok) return;
-        const j = await r.json();
-        setData(j);
-      } catch {}
-    };
-    tick();
-    const t = setInterval(tick, 1000);
+    if (!cargado || !miEmail) return;
+    refetch();
+    const t = setInterval(refetch, 1000);
     return () => clearInterval(t);
-  }, [id, identidad.email, cargado]);
+  }, [cargado, miEmail, refetch]);
 
   useEffect(() => {
-    if (!data || !identidad.email || !identidad.nombre) return;
-    const yaEstoy = data.jugadores.some((p) => p.email === identidad.email);
-    const fueOfrecido = data.cartones.some((c) => c.ofrecidoA === identidad.email);
+    if (!data || !miEmail || !identidad.nombre) return;
+    const yaEstoy = data.jugadores.some((p) => p.email === miEmail);
+    const fueOfrecido = data.cartones.some((c) => c.ofrecidoA === miEmail);
     if (!yaEstoy || !fueOfrecido) {
       if (data.estado === "lobby" || data.estado === "eligiendo") {
         fetch(`/api/bingo/juegos/${id}/unirse`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email: identidad.email, nombre: identidad.nombre }),
+          body: JSON.stringify({ email: miEmail, nombre: identidad.nombre }),
         }).then(async (r) => {
           if (!r.ok) {
             const e = await r.json();
@@ -95,14 +110,19 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
         });
       }
     }
-  }, [data, identidad.email, identidad.nombre, id]);
+  }, [data, miEmail, identidad.nombre, id]);
 
   const misCartones = useMemo(() => (data ? data.cartones : []), [data]);
-  const opciones = misCartones.filter((c) => !c.elegido && c.ofrecidoA === identidad.email);
-  const elegidos = misCartones.filter((c) => c.elegido && c.jugadorEmail === identidad.email);
+  const opciones = misCartones.filter((c) => !c.elegido && c.ofrecidoA === miEmail);
+  const elegidos = misCartones.filter((c) => c.elegido && c.jugadorEmail === miEmail);
 
   const ultimoCantado =
     data && data.sorteos.length > 0 ? data.sorteos[data.sorteos.length - 1].numero : null;
+
+  const cantados = useMemo(
+    () => new Set((data?.sorteos ?? []).map((s) => s.numero)),
+    [data],
+  );
 
   const misMarcasPorCarton = useMemo(() => {
     const m = new Map<string, Set<number>>();
@@ -114,15 +134,87 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
     return m;
   }, [data]);
 
-  // Premios que todavía no tienen ganador.
+  const marcasEfectivasPorCarton = useMemo(() => {
+    const m = new Map<string, Set<number>>();
+    for (const c of elegidos) {
+      const server = misMarcasPorCarton.get(c.id) ?? new Set<number>();
+      const opt = marcasOpt.get(c.id);
+      const eff = new Set(server);
+      if (opt) {
+        for (const n of opt.add) eff.add(n);
+        for (const n of opt.remove) eff.delete(n);
+      }
+      m.set(c.id, eff);
+    }
+    return m;
+  }, [elegidos, misMarcasPorCarton, marcasOpt]);
+
+  // Reconciliación: cuando el servidor refleja el cambio optimista, se quita.
+  useEffect(() => {
+    setMarcasOpt((prev) => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Map(prev);
+      for (const [cartonId, { add, remove }] of prev) {
+        const server = misMarcasPorCarton.get(cartonId) ?? new Set<number>();
+        const nAdd = new Set<number>();
+        const nRem = new Set<number>();
+        for (const n of add) if (!server.has(n)) nAdd.add(n);
+        for (const n of remove) if (server.has(n)) nRem.add(n);
+        if (nAdd.size !== add.size || nRem.size !== remove.size) changed = true;
+        if (nAdd.size === 0 && nRem.size === 0) next.delete(cartonId);
+        else next.set(cartonId, { add: nAdd, remove: nRem });
+      }
+      return changed ? next : prev;
+    });
+  }, [misMarcasPorCarton]);
+
+  const todasMisMarcas = useMemo(() => {
+    const s = new Set<number>();
+    for (const c of elegidos) {
+      const m = marcasEfectivasPorCarton.get(c.id);
+      if (m) for (const n of m) s.add(n);
+    }
+    return s;
+  }, [elegidos, marcasEfectivasPorCarton]);
+
+  const numerosEnMisCartones = useMemo(() => {
+    const s = new Set<number>();
+    for (const c of elegidos) for (const fila of c.numeros) for (const n of fila) if (n !== null) s.add(n);
+    return s;
+  }, [elegidos]);
+
+  const numerosNoMarcados = useMemo(() => {
+    const out: number[] = [];
+    for (const s of data?.sorteos ?? []) {
+      if (numerosEnMisCartones.has(s.numero) && !todasMisMarcas.has(s.numero)) {
+        out.push(s.numero);
+      }
+    }
+    return out;
+  }, [data, numerosEnMisCartones, todasMisMarcas]);
+
+  const historialOrdenado = useMemo(() => {
+    const copy = (data?.sorteos ?? []).slice();
+    if (ordenHistorial === "numero") copy.sort((a, b) => a.numero - b.numero);
+    else copy.sort((a, b) => b.orden - a.orden);
+    return copy;
+  }, [data, ordenHistorial]);
+
   const premiosPendientes = useMemo(() => {
-    if (!data) return [];
-    const ganados = new Set(data.ganadores.map((g) => g.patron));
-    return data.patrones.filter((p) => !ganados.has(p));
-  }, [data]);
+    if (!data) return [] as Patron[];
+    return data.patrones.filter((p) => {
+      const ganadoresP = data.ganadores.filter((g) => g.patron === p);
+      if (ganadoresP.length === 0) return true;
+      const primer = ganadoresP[0];
+      if (primer.indiceActualGanado !== data.indiceActual) return false;
+      if (ganadoresP.some((g) => g.email === miEmail)) return false;
+      return true;
+    });
+  }, [data, miEmail]);
 
   if (!cargado) return null;
-  if (!identidad.email || !identidad.nombre) {
+  if (!miEmail || !identidad.nombre) {
     return (
       <main className="mx-auto max-w-xl px-6 py-12 text-center">
         <p className="text-zinc-300">
@@ -152,24 +244,54 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
     await fetch(`/api/bingo/juegos/${id}/elegir`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: identidad.email, cartonIds: seleccion }),
+      body: JSON.stringify({ email: miEmail, cartonIds: seleccion }),
     });
     setSeleccion([]);
+    await refetch();
   };
 
-  const marcarNumero = async (cartonId: string, numero: number) => {
+  const marcarNumero = (cartonId: string, numero: number) => {
     if (data.estado !== "en_curso") return;
-    const yaMarcado = misMarcasPorCarton.get(cartonId)?.has(numero);
-    await fetch(`/api/bingo/juegos/${id}/marcar`, {
+    const efectivas = marcasEfectivasPorCarton.get(cartonId) ?? new Set<number>();
+    const yaMarcado = efectivas.has(numero);
+    setMarcasOpt((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(cartonId) ?? { add: new Set<number>(), remove: new Set<number>() };
+      const add = new Set(cur.add);
+      const remove = new Set(cur.remove);
+      if (yaMarcado) {
+        add.delete(numero);
+        remove.add(numero);
+      } else {
+        remove.delete(numero);
+        add.add(numero);
+      }
+      next.set(cartonId, { add, remove });
+      return next;
+    });
+    const revertir = () => {
+      setMarcasOpt((prev) => {
+        const cur = prev.get(cartonId);
+        if (!cur) return prev;
+        const add = new Set(cur.add);
+        const remove = new Set(cur.remove);
+        if (yaMarcado) remove.delete(numero);
+        else add.delete(numero);
+        const next = new Map(prev);
+        if (add.size === 0 && remove.size === 0) next.delete(cartonId);
+        else next.set(cartonId, { add, remove });
+        return next;
+      });
+    };
+    fetch(`/api/bingo/juegos/${id}/marcar`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        email: identidad.email,
-        cartonId,
-        numero,
-        desmarcar: yaMarcado,
-      }),
-    });
+      body: JSON.stringify({ email: miEmail, cartonId, numero, desmarcar: yaMarcado }),
+    })
+      .then((r) => {
+        if (!r.ok) revertir();
+      })
+      .catch(revertir);
   };
 
   const cantarBingo = async (cartonId: string, patron: Patron) => {
@@ -177,11 +299,12 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
     const r = await fetch(`/api/bingo/juegos/${id}/bingo`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: identidad.email, cartonId, patron }),
+      body: JSON.stringify({ email: miEmail, cartonId, patron }),
     });
     const j = await r.json();
     setResultadoBingo({ valido: !!j.valido, faltantes: j.faltantes ?? 0, patron });
     setTimeout(() => setResultadoBingo(null), 6000);
+    await refetch();
   };
 
   return (
@@ -202,7 +325,7 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
         </div>
         <div className="text-right">
           <div className="text-xs text-zinc-400">Números cantados</div>
-          <div className="text-2xl font-bold text-zinc-100">{data.cantadosCount}/99</div>
+          <div className="text-2xl font-bold text-zinc-100">{data.cantadosCount}/90</div>
         </div>
       </div>
 
@@ -217,17 +340,17 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
           <span className="font-semibold">🎯 Premios en juego:</span>
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             {data.patrones.map((p) => {
-              const g = data.ganadores.find((x) => x.patron === p);
-              const nombreG = g
-                ? data.jugadores.find((j) => j.email === g.email)?.nombre ?? g.email
-                : null;
+              const gs = data.ganadores.filter((x) => x.patron === p);
+              const nombres = gs.map(
+                (g) => data.jugadores.find((j) => j.email === g.email)?.nombre ?? g.email,
+              );
               return (
                 <li key={p}>
                   <span className="font-medium">{patronLabel(p)}</span>{" "}
                   <span className="text-violet-300">— {patronDescripcion(p)}</span>
-                  {nombreG && (
+                  {nombres.length > 0 && (
                     <span className="ml-2 text-xs text-emerald-300">
-                      ✓ ganó {nombreG}
+                      ✓ {nombres.join(", ")}
                     </span>
                   )}
                 </li>
@@ -294,7 +417,10 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
               </h2>
               <div className="text-right">
                 {ultimoCantado !== null ? (
-                  <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-amber-500 text-4xl font-bold text-zinc-900 shadow-lg">
+                  <div
+                    key={ultimoCantado}
+                    className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-amber-500 text-4xl font-bold text-zinc-900 shadow-lg"
+                  >
                     {ultimoCantado}
                   </div>
                 ) : (
@@ -304,19 +430,38 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
             </div>
             {data.historialVisibleJugador && data.sorteos.length > 1 && (
               <div className="mt-3">
-                <div className="mb-1 text-xs text-zinc-500">Anteriores (más recientes primero):</div>
-                <div className="flex flex-wrap gap-1">
-                  {data.sorteos
-                    .slice(0, -1)
-                    .reverse()
-                    .map((s) => (
-                      <span
-                        key={s.orden}
-                        className="rounded bg-zinc-900 px-2 py-1 text-xs text-zinc-300"
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-xs text-zinc-500">Historial de números cantados:</span>
+                  <div className="flex overflow-hidden rounded-lg border border-zinc-700">
+                    {(["aparicion", "numero"] as OrdenHistorial[]).map((o) => (
+                      <button
+                        key={o}
+                        type="button"
+                        onClick={() => setOrdenHistorial(o)}
+                        className={`px-3 py-1 text-xs transition-colors ${
+                          ordenHistorial === o
+                            ? "bg-violet-600 text-white"
+                            : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                        }`}
                       >
-                        {s.numero}
-                      </span>
+                        {o === "aparicion" ? "Aparición" : "Número"}
+                      </button>
                     ))}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {historialOrdenado.map((s) => (
+                    <span
+                      key={s.orden}
+                      className={`rounded px-2 py-1 text-xs ${
+                        s.numero === ultimoCantado
+                          ? "bg-amber-500 text-zinc-900 font-bold"
+                          : "bg-zinc-900 text-zinc-300"
+                      }`}
+                    >
+                      {s.numero}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
@@ -325,11 +470,48 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
                 El historial de números cantados no está visible para los jugadores en este juego.
               </div>
             )}
+            {data.avisarNumerosPasados && numerosNoMarcados.length > 0 && (
+              <div className="mt-3 rounded-lg border border-rose-700/40 bg-rose-900/20 px-3 py-2 text-xs">
+                <span className="font-medium text-rose-300">Se te pasaron {numerosNoMarcados.length} número(s):</span>{" "}
+                <span className="text-rose-200">{numerosNoMarcados.join(", ")}</span>
+                <span className="ml-1 text-rose-400">— márcalos en tu cartón</span>
+              </div>
+            )}
           </section>
+
+          {data.estado === "terminado" && data.numerosNoCantados && data.numerosNoCantados.length > 0 && (
+            <section className="mb-4 rounded-xl border border-zinc-700 bg-zinc-800 p-4">
+              <h2 className="mb-3 border-l-2 border-violet-500 pl-3 text-sm font-semibold text-zinc-200">
+                Números no cantados ({data.numerosNoCantados.length}){" "}
+                <span className="ml-2 text-xs font-normal text-zinc-500">
+                  en el orden en que hubieran salido
+                </span>
+              </h2>
+              <div className="flex flex-wrap gap-1.5">
+                {data.numerosNoCantados.map((n, i) => (
+                  <span
+                    key={i}
+                    className="rounded bg-zinc-900/60 px-2 py-1 text-xs text-zinc-400 border border-zinc-800"
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="space-y-4">
             {elegidos.map((c) => {
-              const marcas = misMarcasPorCarton.get(c.id) ?? new Set<number>();
+              const marcas = marcasEfectivasPorCarton.get(c.id) ?? new Set<number>();
+              const puedeGanar = (patron: Patron): boolean => {
+                if (patron === "dos_cartones_llenos") {
+                  return chequearDosCartonesLlenos(
+                    elegidos.map((x) => x.numeros),
+                    todasMisMarcas,
+                  ).gana;
+                }
+                return chequearPatron(c.numeros, marcas, patron).gana;
+              };
               return (
                 <div key={c.id} className="rounded-xl border border-zinc-700 bg-zinc-800 p-4">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -338,22 +520,32 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
                     </span>
                     {data.estado === "en_curso" && premiosPendientes.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {premiosPendientes.map((p) => (
-                          <button
-                            key={p}
-                            type="button"
-                            onClick={() => cantarBingo(c.id, p)}
-                            className="rounded-lg border border-amber-500 bg-amber-500 px-4 py-2 text-xs font-bold uppercase text-zinc-900 transition-transform hover:scale-105"
-                          >
-                            ¡{patronLabel(p)}!
-                          </button>
-                        ))}
+                        {premiosPendientes.map((p) => {
+                          const listo = puedeGanar(p);
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              disabled={!listo}
+                              onClick={() => cantarBingo(c.id, p)}
+                              title={listo ? "Cantar este premio" : "Aún te faltan números por marcar"}
+                              className={`rounded-lg border px-4 py-2 text-xs font-bold uppercase transition-transform ${
+                                listo
+                                  ? "border-amber-500 bg-amber-500 text-zinc-900 hover:scale-105 cursor-pointer"
+                                  : "border-zinc-700 bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                              }`}
+                            >
+                              ¡{patronLabel(p)}!
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                   <Carton
                     numeros={c.numeros}
                     marcados={marcas}
+                    cantados={data.avisarNumerosPasados ? cantados : undefined}
                     onClickNumero={
                       data.estado === "en_curso" ? (n) => marcarNumero(c.id, n) : undefined
                     }
@@ -381,18 +573,28 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
             <section className="mt-6 rounded-xl border border-emerald-600 bg-emerald-900/30 p-5">
               <div className="mb-2 text-sm font-semibold text-emerald-300">Ganadores</div>
               <ul className="space-y-1.5">
-                {data.ganadores.map((g) => {
-                  const nombre =
-                    data.jugadores.find((p) => p.email === g.email)?.nombre ?? g.email;
-                  return (
-                    <li key={g.patron} className="flex items-center justify-between text-sm">
-                      <span className="text-emerald-100">
-                        <span className="font-medium">{patronLabel(g.patron)}:</span> {nombre}
-                      </span>
-                      <span className="text-xs text-emerald-300">{fmtHora(g.cantadoAt)}</span>
-                    </li>
-                  );
-                })}
+                {data.patrones
+                  .filter((p) => data.ganadores.some((g) => g.patron === p))
+                  .map((p) => {
+                    const gs = data.ganadores
+                      .filter((g) => g.patron === p)
+                      .sort((a, b) => a.cantadoAt - b.cantadoAt);
+                    return (
+                      <li key={p} className="text-sm">
+                        <span className="font-medium text-emerald-100">{patronLabel(p)}:</span>{" "}
+                        <span className="text-emerald-100">
+                          {gs
+                            .map((g) => {
+                              const nombre =
+                                data.jugadores.find((p2) => p2.email === g.email)?.nombre ??
+                                g.email;
+                              return `${nombre} (${fmtHora(g.cantadoAt)})`;
+                            })
+                            .join(", ")}
+                        </span>
+                      </li>
+                    );
+                  })}
               </ul>
             </section>
           )}

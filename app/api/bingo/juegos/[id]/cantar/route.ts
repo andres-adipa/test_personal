@@ -13,6 +13,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (email !== j.lider) return NextResponse.json({ error: "Solo el líder canta números" }, { status: 403 });
   if (j.estado !== "en_curso") return NextResponse.json({ error: "El juego no está en curso" }, { status: 400 });
 
+  // Si el último premio ya tiene ganador, el líder debe usar "Terminar juego",
+  // no "Cantar siguiente" (para cerrar la ventana de empate del último premio).
+  const ultimoPremio = j.patrones[j.patrones.length - 1];
+  const ultimoGanado = j.ganadores.some((g) => g.patron === ultimoPremio);
+  if (ultimoGanado) {
+    return NextResponse.json(
+      { error: "Usa 'Terminar juego' para cerrar la partida" },
+      { status: 400 },
+    );
+  }
+
   const siguiente = j.indiceActual + 1;
   if (siguiente >= j.numerosBarajados.length) {
     return NextResponse.json({ error: "Ya se cantaron todos los números" }, { status: 400 });

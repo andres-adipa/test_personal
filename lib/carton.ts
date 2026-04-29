@@ -1,15 +1,13 @@
 import type { Cuadricula } from "./types";
 
 // Bingo chileno: 3 filas x 9 columnas, 15 números, 12 vacíos.
-// Cada columna es una decena (col 0: 1..9, col 1: 10..19, ..., col 8: 80..99).
+// Rango total 1..90. Cada columna es una decena (col 8: 80..90).
 // Cada fila tiene exactamente 5 números y 4 vacíos.
 // Cada columna tiene entre 1 y 3 números.
 
 export function rangoColumna(c: number): [number, number] {
-  // Formato tradicional chileno: cada columna es una decena.
-  // Col 0: 1..9, Col 1: 10..19, ..., Col 7: 70..79, Col 8: 80..99
   if (c === 0) return [1, 9];
-  if (c === 8) return [80, 99];
+  if (c === 8) return [80, 90];
   return [c * 10, c * 10 + 9];
 }
 
