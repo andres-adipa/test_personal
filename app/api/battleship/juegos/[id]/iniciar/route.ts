@@ -22,6 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     j.jugadores.length,
     j.config.barcosPorJugador,
     j.config.tamanoBarco,
+    j.config.densidad ?? "tranquilo",
   );
 
   const barcos: Barco[] = [];

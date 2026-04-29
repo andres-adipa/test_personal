@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listarJuegos, setJuego, nuevoId } from "@/lib/battleship/store";
-import type { Juego, ResumenJuego } from "@/lib/battleship/types";
+import type { DensidadMapa, Juego, ResumenJuego } from "@/lib/battleship/types";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,9 @@ export async function POST(req: NextRequest) {
   const robaInformacion = body.robaInformacion === true;
   const liderJugador = body.liderJugador === true;
   const autoLanzar = body.autoLanzar === true;
+  const densidadCruda = String(body.densidad ?? "normal");
+  const densidad: DensidadMapa =
+    densidadCruda === "denso" || densidadCruda === "tranquilo" ? densidadCruda : "normal";
 
   if (!titulo || !lider) {
     return NextResponse.json({ error: "Título y email del líder son obligatorios" }, { status: 400 });
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest) {
     id,
     titulo,
     lider,
-    config: { barcosPorJugador, tamanoBarco, permitirEspectador, robaInformacion, liderJugador, autoLanzar },
+    config: { barcosPorJugador, tamanoBarco, permitirEspectador, robaInformacion, liderJugador, autoLanzar, densidad },
     estado: "lobby",
     tablero: null,
     jugadores: [],

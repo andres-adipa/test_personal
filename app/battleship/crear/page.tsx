@@ -15,6 +15,7 @@ export default function CrearBattleshipPage() {
   const [robaInformacion, setRobaInformacion] = useState(false);
   const [liderJugador, setLiderJugador] = useState(false);
   const [autoLanzar, setAutoLanzar] = useState(true);
+  const [densidad, setDensidad] = useState<"denso" | "normal" | "tranquilo">("normal");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +43,7 @@ export default function CrearBattleshipPage() {
           robaInformacion,
           liderJugador,
           autoLanzar,
+          densidad,
         }),
       });
       const j = await r.json();
@@ -97,6 +99,54 @@ export default function CrearBattleshipPage() {
               onChange={(e) => setTamanoBarco(parseInt(e.target.value, 10) || 3)}
               className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500 focus:outline-none"
             />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs text-zinc-400">Densidad del mapa</label>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                {
+                  v: "denso",
+                  titulo: "Denso",
+                  resumen: "30% del mapa con barcos",
+                  detalle: "Mapa pequeño, partidas rápidas. Más probabilidad de pegar y de que te peguen.",
+                  color: "border-rose-500/70 bg-rose-950/30 text-rose-100",
+                  activo: "ring-2 ring-rose-400",
+                },
+                {
+                  v: "normal",
+                  titulo: "Normal",
+                  resumen: "22% del mapa con barcos",
+                  detalle: "Balanceado: hay espacio para esconderse, pero los disparos suelen acertar.",
+                  color: "border-violet-500/70 bg-violet-950/30 text-violet-100",
+                  activo: "ring-2 ring-violet-400",
+                },
+                {
+                  v: "tranquilo",
+                  titulo: "Tranquilo",
+                  resumen: "15% del mapa con barcos",
+                  detalle: "Mapa grande con espacio. Partidas largas y exploratorias.",
+                  color: "border-sky-500/70 bg-sky-950/30 text-sky-100",
+                  activo: "ring-2 ring-sky-400",
+                },
+              ] as const
+            ).map((op) => {
+              const sel = densidad === op.v;
+              return (
+                <button
+                  type="button"
+                  key={op.v}
+                  onClick={() => setDensidad(op.v)}
+                  className={`rounded-lg border p-3 text-left text-xs transition ${op.color} ${sel ? op.activo : "opacity-70 hover:opacity-100"}`}
+                >
+                  <div className="text-sm font-bold">{op.titulo}</div>
+                  <div className="mt-0.5 text-[11px] opacity-80">{op.resumen}</div>
+                  <div className="mt-1 text-[11px] opacity-90">{op.detalle}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

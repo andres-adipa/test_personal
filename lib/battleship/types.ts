@@ -85,6 +85,8 @@ export type EventoRonda = {
   hitsPublicos?: EventoHitPublico[]; // sólo se llena al filtrar para un jugador no involucrado
 };
 
+export type DensidadMapa = "denso" | "normal" | "tranquilo";
+
 export type ConfigJuego = {
   barcosPorJugador: number;
   tamanoBarco: number;
@@ -92,6 +94,7 @@ export type ConfigJuego = {
   robaInformacion: boolean;
   liderJugador: boolean;
   autoLanzar: boolean;
+  densidad: DensidadMapa;
 };
 
 export type Tablero = {

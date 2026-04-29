@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, use, useEffect, useMemo, useRef, useState } from "react";
 import IdentidadForm, { useIdentidad } from "@/app/components/Identidad";
 import Tablero, { type BarcoVisible } from "@/app/battleship/components/Tablero";
+import BannerRevelado from "@/app/battleship/components/BannerRevelado";
 import { coordLabel } from "@/lib/battleship/coords";
 import { calcularPodio, type ItemPodio } from "@/lib/battleship/podio";
 
@@ -47,7 +48,7 @@ type Estado = {
   id: string;
   titulo: string;
   lider: string;
-  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean };
+  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean; densidad?: "denso" | "normal" | "tranquilo" };
   estado: "lobby" | "en_ronda" | "revelando" | "terminado";
   tablero: { ancho: number; alto: number } | null;
   rondaActual: number;
@@ -354,8 +355,16 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
               </div>
 
               {data.estado === "revelando" && ultimaRondaRevelada && (
-                <div className="mb-2 rounded-lg border border-fuchsia-700 bg-fuchsia-950/40 p-2 text-xs text-fuchsia-200">
-                  Ronda {ultimaRondaRevelada.ronda} cerrada — próxima en breve...
+                <div className="mb-3 space-y-2">
+                  <BannerRevelado
+                    evento={ultimaRondaRevelada}
+                    jugadores={data.jugadores}
+                    veTodo={data.esEspectador}
+                  />
+                  <ToastPersonalRonda
+                    evento={ultimaRondaRevelada}
+                    miEmail={identidad.email}
+                  />
                 </div>
               )}
 
@@ -481,6 +490,71 @@ function computarEtapa(d: Estado, now: number): EtapaInfo | null {
   };
 }
 
+function ToastPersonalRonda({
+  evento,
+  miEmail,
+}: {
+  evento: EventoRonda;
+  miEmail: string;
+}) {
+  const misAtaques = evento.hits.filter((h) => h.atacante === miEmail);
+  const golpesRecibidos = evento.hits.filter((h) => h.victima === miEmail);
+  const fuiEliminado = evento.eliminados.includes(miEmail);
+  const yoFalle = evento.fails.filter((f) => f.atacante === miEmail).length;
+
+  // Construir mensaje sobre lo que ME pasó
+  const lineas: { txt: string; color: string }[] = [];
+  for (const h of misAtaques) {
+    lineas.push({
+      txt: h.hundeBarco
+        ? `🔥 ¡Le hundiste un barco a ${h.victimaNombre}!`
+        : `🎯 Le pegaste a ${h.victimaNombre} en ${coordLabel(h.fila, h.col)}`,
+      color: "text-emerald-200",
+    });
+  }
+  for (const h of golpesRecibidos) {
+    lineas.push({
+      txt: h.hundeBarco
+        ? `💀 ${h.atacanteNombre} te hundió un barco`
+        : `💥 ${h.atacanteNombre} te impactó en ${coordLabel(h.fila, h.col)}`,
+      color: "text-red-300",
+    });
+  }
+  if (fuiEliminado) {
+    lineas.push({ txt: "🪦 Te eliminaron de la partida", color: "text-rose-300" });
+  }
+
+  if (lineas.length === 0) {
+    if (yoFalle > 0) {
+      return (
+        <div className="rounded-xl border border-zinc-700 bg-zinc-900/80 p-3 text-center text-sm text-zinc-400">
+          🌊 Tu disparo fue al agua
+        </div>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-700 bg-zinc-900/80 p-3">
+      <div className="mb-1 text-center text-[11px] uppercase tracking-widest text-zinc-500">
+        A ti esta ronda
+      </div>
+      <ul className="space-y-1 text-center text-sm font-semibold">
+        {lineas.map((l, i) => (
+          <li
+            key={i}
+            className={`battleship-fade-in ${l.color}`}
+            style={{ animationDelay: `${i * 140}ms` }}
+          >
+            {l.txt}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ItemRondaJugador({
   evento,
   miEmail,
@@ -509,46 +583,56 @@ function ItemRondaJugador({
     misHerencias.length === 0 &&
     hitsPublicos.length === 0;
 
+  // Indexador local de animación para que cada línea aparezca con delay
+  let idx = 0;
+  const fadeStyle = (): CSSProperties => ({
+    animationDelay: `${idx++ * 100}ms`,
+  });
+
   return (
     <div className="rounded border border-zinc-700 bg-zinc-900 p-2">
       <div className="mb-1 font-semibold text-violet-300">Ronda {evento.ronda}</div>
       {sinNada && <p className="text-zinc-500">Nada para ti esta ronda.</p>}
       <ul className="space-y-1 leading-tight">
         {misAtaques.map((h, i) => (
-          <li key={`a${i}`} className="text-emerald-200">
+          <li key={`a${i}`} className="battleship-fade-in text-emerald-200" style={fadeStyle()}>
             🎯 Le pegaste a <strong>{h.victimaNombre}</strong> en {coordLabel(h.fila, h.col)}
             {h.hundeBarco && " — ¡y le hundiste un barco!"}
           </li>
         ))}
         {evento.fails.length > 0 && (
-          <li className="text-zinc-500">
+          <li className="battleship-fade-in text-zinc-500" style={fadeStyle()}>
             🌊 {evento.fails.length} disparo(s) tuyos al agua
           </li>
         )}
         {golpesRecibidos.map((h, i) => (
-          <li key={`r${i}`} className="text-red-300">
+          <li key={`r${i}`} className="battleship-fade-in text-red-300" style={fadeStyle()}>
             💥 <strong>{h.atacanteNombre}</strong> te impactó en {coordLabel(h.fila, h.col)}
             {h.hundeBarco && " — y hundió uno de tus barcos"}
           </li>
         ))}
         {hitsPublicos.map((h, i) => (
-          <li key={`p${i}`} className="text-zinc-300">
+          <li key={`p${i}`} className="battleship-fade-in text-zinc-300" style={fadeStyle()}>
             ⚔️ <strong>{h.atacanteNombre}</strong> le pegó a{" "}
             <strong>{h.victimaNombre}</strong>
             {h.hundeBarco && " — ¡y le hundió un barco!"}
           </li>
         ))}
         {misHerencias.map((h, i) => (
-          <li key={`h${i}`} className="text-fuchsia-300">
+          <li key={`h${i}`} className="battleship-fade-in text-fuchsia-300" style={fadeStyle()}>
             🧠 Heredaste la info de <strong>{h.victimaNombre}</strong>
             {h.celdasGanadas > 0 && ` (+${h.celdasGanadas} celda(s) nueva(s))`}
           </li>
         ))}
         {fuiEliminadoEstaRonda && (
-          <li className="font-semibold text-red-300">🪦 Fuiste eliminado.</li>
+          <li className="battleship-fade-in font-semibold text-red-300" style={fadeStyle()}>
+            🪦 Fuiste eliminado.
+          </li>
         )}
         {otrosEliminados.length > 0 && (
-          <li className="text-amber-300">Eliminados: {otrosEliminadosNombres}</li>
+          <li className="battleship-fade-in text-amber-300" style={fadeStyle()}>
+            Eliminados: {otrosEliminadosNombres}
+          </li>
         )}
       </ul>
     </div>

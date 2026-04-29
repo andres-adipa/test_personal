@@ -27,3 +27,13 @@ html, body {
   animation: hundirBarco 1.4s cubic-bezier(0.5, 0, 0.5, 1.2) both;
   transform-origin: center;
 }
+
+@keyframes battleshipFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.battleship-fade-in {
+  opacity: 0;
+  animation: battleshipFadeIn 0.35s ease-out forwards;
+}

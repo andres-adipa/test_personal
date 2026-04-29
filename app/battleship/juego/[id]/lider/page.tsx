@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useEffect, useRef, useState } from "react";
 import IdentidadForm, { useIdentidad } from "@/app/components/Identidad";
 import Tablero, { type BarcoVisible } from "@/app/battleship/components/Tablero";
+import BannerRevelado from "@/app/battleship/components/BannerRevelado";
 import { coordLabel } from "@/lib/battleship/coords";
 import { calcularPodio, type ItemPodio } from "@/lib/battleship/podio";
 
@@ -42,7 +43,7 @@ type Estado = {
   id: string;
   titulo: string;
   lider: string;
-  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean };
+  config: { barcosPorJugador: number; tamanoBarco: number; permitirEspectador: boolean; robaInformacion: boolean; liderJugador: boolean; autoLanzar: boolean; densidad?: "denso" | "normal" | "tranquilo" };
   estado: "lobby" | "en_ronda" | "revelando" | "terminado";
   tablero: { ancho: number; alto: number } | null;
   rondaActual: number;
@@ -330,6 +331,17 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
             </div>
           )}
 
+          {data.estado === "revelando" &&
+            data.eventosPorRonda.length > 0 && (
+              <div className="mb-3">
+                <BannerRevelado
+                  evento={data.eventosPorRonda[data.eventosPorRonda.length - 1]}
+                  jugadores={data.jugadores}
+                  veTodo={!liderJuegaVivo}
+                />
+              </div>
+            )}
+
           {data.tablero && (
             <Tablero
               ancho={data.tablero.ancho}
@@ -379,7 +391,11 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
                 ) : (
                   <ul className="space-y-1">
                     {ev.hits.map((h, i) => (
-                      <li key={i} className="leading-tight">
+                      <li
+                        key={i}
+                        className="battleship-fade-in leading-tight"
+                        style={{ animationDelay: `${i * 90}ms` }}
+                      >
                         <span className="text-zinc-300">{h.atacanteNombre}</span>{" "}
                         <span className="text-zinc-500">→</span>{" "}
                         <span className="text-zinc-300">{h.victimaNombre}</span>{" "}
