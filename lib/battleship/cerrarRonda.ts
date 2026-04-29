@@ -1,5 +1,11 @@
 import { celdasDeBarco } from "./colocacion";
-import type { EventoFail, EventoHerencia, EventoHit, Juego } from "./types";
+import type {
+  EventoDesperdicio,
+  EventoFail,
+  EventoHerencia,
+  EventoHit,
+  Juego,
+} from "./types";
 
 // Aplica la lógica de cierre de ronda sobre el objeto Juego (mutación in-place).
 // Devuelve `todosBarcosHundidos` para que el llamador decida si pasa a "terminado"
@@ -19,6 +25,7 @@ export function cerrarRondaEnMemoria(j: Juego): { todosBarcosHundidos: boolean }
 
   const hitsEvento: EventoHit[] = [];
   const failsEvento: EventoFail[] = [];
+  const desperdiciosEvento: EventoDesperdicio[] = [];
   const herenciasEvento: EventoHerencia[] = [];
 
   for (const bomba of bombasRonda.sort((a, b) => a.lanzadaAt - b.lanzadaAt)) {
@@ -30,7 +37,15 @@ export function cerrarRondaEnMemoria(j: Juego): { todosBarcosHundidos: boolean }
       if (!atacanteJug.conocidas.includes(key)) atacanteJug.conocidas.push(key);
     }
 
-    if (celdasYaImpactadas.has(key)) continue;
+    if (celdasYaImpactadas.has(key)) {
+      // Disparo desperdiciado: celda ya impactada en una ronda anterior
+      const atacante = j.jugadores.find((p) => p.email === bomba.email);
+      desperdiciosEvento.push({
+        atacante: bomba.email,
+        atacanteNombre: atacante?.nombre ?? bomba.email,
+      });
+      continue;
+    }
     const barcoId = celdaABarco.get(key) ?? null;
     j.hits.push({ fila: bomba.fila, col: bomba.col, ronda, barcoId });
     celdasYaImpactadas.add(key);
@@ -124,6 +139,7 @@ export function cerrarRondaEnMemoria(j: Juego): { todosBarcosHundidos: boolean }
     ronda,
     hits: hitsEvento,
     fails: failsEvento,
+    desperdicios: desperdiciosEvento,
     herencias: herenciasEvento,
     eliminados,
   });

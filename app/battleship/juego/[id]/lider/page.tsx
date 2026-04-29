@@ -331,17 +331,6 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
             </div>
           )}
 
-          {data.estado === "revelando" &&
-            data.eventosPorRonda.length > 0 && (
-              <div className="mb-3">
-                <BannerRevelado
-                  evento={data.eventosPorRonda[data.eventosPorRonda.length - 1]}
-                  jugadores={data.jugadores}
-                  veTodo={!liderJuegaVivo}
-                />
-              </div>
-            )}
-
           {data.tablero && (
             <Tablero
               ancho={data.tablero.ancho}
@@ -370,6 +359,16 @@ export default function LiderBattleshipPage({ params }: { params: Promise<{ id: 
 
         {/* Sidebar: historial de rondas */}
         <aside className="rounded-xl border border-zinc-700 bg-zinc-800 p-3 text-xs">
+          {data.eventosPorRonda.length > 0 && data.estado !== "terminado" && (
+            <div className="mb-3">
+              <BannerRevelado
+                evento={data.eventosPorRonda[data.eventosPorRonda.length - 1]}
+                jugadores={data.jugadores}
+                veTodo={!liderJuegaVivo}
+                etiqueta={`Resultados ronda ${data.eventosPorRonda[data.eventosPorRonda.length - 1].ronda}`}
+              />
+            </div>
+          )}
           <h2 className="mb-2 border-l-2 border-violet-500 pl-3 font-semibold text-zinc-200">
             Historial de rondas
           </h2>

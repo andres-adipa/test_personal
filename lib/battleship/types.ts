@@ -62,6 +62,11 @@ export type EventoFail = {
   col: number;
 };
 
+export type EventoDesperdicio = {
+  atacante: string;       // email
+  atacanteNombre: string;
+};
+
 export type EventoHerencia = {
   hundidor: string;
   hundidorNombre: string;
@@ -80,9 +85,15 @@ export type EventoRonda = {
   ronda: number;
   hits: EventoHit[];
   fails: EventoFail[];
+  desperdicios: EventoDesperdicio[]; // disparos a celdas ya impactadas
   herencias: EventoHerencia[];
   eliminados: string[];   // emails recién eliminados esta ronda
   hitsPublicos?: EventoHitPublico[]; // sólo se llena al filtrar para un jugador no involucrado
+  // Conteos globales sin spoiler. Los enviamos a TODOS los jugadores para que
+  // el banner de "Resultados" pueda mostrar el total real de la ronda.
+  totalHits?: number;
+  totalFails?: number;
+  totalDesperdicios?: number;
 };
 
 export type DensidadMapa = "denso" | "normal" | "tranquilo";

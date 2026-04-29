@@ -104,10 +104,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     nombre: j.jugadores.find((p) => p.email === b.email)?.nombre ?? b.email,
   }));
 
-  // Filtro de eventos por rol
+  // Filtro de eventos por rol. Siempre adjuntamos totales globales (sin
+  // spoiler de coordenadas) para que el banner de "Resultados" pueda mostrar
+  // el conteo real de la ronda.
+  const enriquecer = (ev: EventoRonda) => ({
+    totalHits: ev.hits.length,
+    totalFails: (ev.fails ?? []).length,
+    totalDesperdicios: (ev.desperdicios ?? []).length,
+  });
+
   let eventos: EventoRonda[];
   if (verTodo) {
-    eventos = j.eventosPorRonda;
+    eventos = j.eventosPorRonda.map((ev) => ({
+      ...ev,
+      desperdicios: ev.desperdicios ?? [],
+      ...enriquecer(ev),
+    }));
   } else {
     eventos = j.eventosPorRonda.map((ev) => {
       const hitsInvolucrado = ev.hits.filter(
@@ -124,9 +136,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         ronda: ev.ronda,
         hits: hitsInvolucrado,
         fails: ev.fails.filter((f) => f.atacante === email),
+        desperdicios: (ev.desperdicios ?? []).filter((d) => d.atacante === email),
         herencias: (ev.herencias ?? []).filter((h) => h.hundidor === email),
         eliminados: ev.eliminados,
         hitsPublicos,
+        ...enriquecer(ev),
       };
     });
   }

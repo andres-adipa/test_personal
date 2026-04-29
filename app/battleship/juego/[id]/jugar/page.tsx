@@ -39,9 +39,13 @@ type EventoRonda = {
   ronda: number;
   hits: EventoHit[];
   fails: { atacante: string; atacanteNombre: string; fila: number; col: number }[];
+  desperdicios?: { atacante: string; atacanteNombre: string }[];
   herencias: EventoHerencia[];
   eliminados: string[];
   hitsPublicos?: EventoHitPublico[];
+  totalHits?: number;
+  totalFails?: number;
+  totalDesperdicios?: number;
 };
 
 type Estado = {
@@ -355,12 +359,7 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
               </div>
 
               {data.estado === "revelando" && ultimaRondaRevelada && (
-                <div className="mb-3 space-y-2">
-                  <BannerRevelado
-                    evento={ultimaRondaRevelada}
-                    jugadores={data.jugadores}
-                    veTodo={data.esEspectador}
-                  />
+                <div className="mb-3">
                   <ToastPersonalRonda
                     evento={ultimaRondaRevelada}
                     miEmail={identidad.email}
@@ -395,6 +394,16 @@ export default function JugarBattleshipPage({ params }: { params: Promise<{ id: 
             </div>
 
             <aside className="rounded-xl border border-zinc-700 bg-zinc-800 p-3 text-xs">
+              {ultimaRondaRevelada && data.estado !== "terminado" && (
+                <div className="mb-3">
+                  <BannerRevelado
+                    evento={ultimaRondaRevelada}
+                    jugadores={data.jugadores}
+                    veTodo={data.esEspectador}
+                    etiqueta={`Resultados ronda ${ultimaRondaRevelada.ronda}`}
+                  />
+                </div>
+              )}
               <h2 className="mb-2 border-l-2 border-violet-500 pl-3 font-semibold text-zinc-200">
                 Mi historial
               </h2>
@@ -501,6 +510,9 @@ function ToastPersonalRonda({
   const golpesRecibidos = evento.hits.filter((h) => h.victima === miEmail);
   const fuiEliminado = evento.eliminados.includes(miEmail);
   const yoFalle = evento.fails.filter((f) => f.atacante === miEmail).length;
+  const yoDesperdicie = (evento.desperdicios ?? []).filter(
+    (d) => d.atacante === miEmail,
+  ).length;
 
   // Construir mensaje sobre lo que ME pasó
   const lineas: { txt: string; color: string }[] = [];
@@ -518,6 +530,15 @@ function ToastPersonalRonda({
         ? `💀 ${h.atacanteNombre} te hundió un barco`
         : `💥 ${h.atacanteNombre} te impactó en ${coordLabel(h.fila, h.col)}`,
       color: "text-red-300",
+    });
+  }
+  if (yoDesperdicie > 0) {
+    lineas.push({
+      txt:
+        yoDesperdicie === 1
+          ? "🚫 Disparaste a una celda ya impactada — fue desperdicio"
+          : `🚫 ${yoDesperdicie} disparos a celdas ya impactadas — desperdicio`,
+      color: "text-amber-400",
     });
   }
   if (fuiEliminado) {
@@ -574,12 +595,16 @@ function ItemRondaJugador({
 
   const misHerencias = evento.herencias ?? [];
   const hitsPublicos = evento.hitsPublicos ?? [];
+  const misDesperdicios = (evento.desperdicios ?? []).filter(
+    (d) => d.atacante === miEmail,
+  ).length;
   const sinNada =
     misAtaques.length === 0 &&
     golpesRecibidos.length === 0 &&
     !fuiEliminadoEstaRonda &&
     otrosEliminados.length === 0 &&
     evento.fails.length === 0 &&
+    misDesperdicios === 0 &&
     misHerencias.length === 0 &&
     hitsPublicos.length === 0;
 
@@ -589,52 +614,83 @@ function ItemRondaJugador({
     animationDelay: `${idx++ * 100}ms`,
   });
 
+  const tieneBloqueTuyo =
+    misAtaques.length > 0 ||
+    golpesRecibidos.length > 0 ||
+    evento.fails.length > 0 ||
+    misDesperdicios > 0 ||
+    misHerencias.length > 0 ||
+    fuiEliminadoEstaRonda;
+
   return (
     <div className="rounded border border-zinc-700 bg-zinc-900 p-2">
       <div className="mb-1 font-semibold text-violet-300">Ronda {evento.ronda}</div>
       {sinNada && <p className="text-zinc-500">Nada para ti esta ronda.</p>}
-      <ul className="space-y-1 leading-tight">
-        {misAtaques.map((h, i) => (
-          <li key={`a${i}`} className="battleship-fade-in text-emerald-200" style={fadeStyle()}>
-            🎯 Le pegaste a <strong>{h.victimaNombre}</strong> en {coordLabel(h.fila, h.col)}
-            {h.hundeBarco && " — ¡y le hundiste un barco!"}
-          </li>
-        ))}
-        {evento.fails.length > 0 && (
-          <li className="battleship-fade-in text-zinc-500" style={fadeStyle()}>
-            🌊 {evento.fails.length} disparo(s) tuyos al agua
-          </li>
-        )}
-        {golpesRecibidos.map((h, i) => (
-          <li key={`r${i}`} className="battleship-fade-in text-red-300" style={fadeStyle()}>
-            💥 <strong>{h.atacanteNombre}</strong> te impactó en {coordLabel(h.fila, h.col)}
-            {h.hundeBarco && " — y hundió uno de tus barcos"}
-          </li>
-        ))}
-        {hitsPublicos.map((h, i) => (
-          <li key={`p${i}`} className="battleship-fade-in text-zinc-300" style={fadeStyle()}>
-            ⚔️ <strong>{h.atacanteNombre}</strong> le pegó a{" "}
-            <strong>{h.victimaNombre}</strong>
-            {h.hundeBarco && " — ¡y le hundió un barco!"}
-          </li>
-        ))}
-        {misHerencias.map((h, i) => (
-          <li key={`h${i}`} className="battleship-fade-in text-fuchsia-300" style={fadeStyle()}>
-            🧠 Heredaste la info de <strong>{h.victimaNombre}</strong>
-            {h.celdasGanadas > 0 && ` (+${h.celdasGanadas} celda(s) nueva(s))`}
-          </li>
-        ))}
-        {fuiEliminadoEstaRonda && (
-          <li className="battleship-fade-in font-semibold text-red-300" style={fadeStyle()}>
-            🪦 Fuiste eliminado.
-          </li>
-        )}
-        {otrosEliminados.length > 0 && (
-          <li className="battleship-fade-in text-amber-300" style={fadeStyle()}>
-            Eliminados: {otrosEliminadosNombres}
-          </li>
-        )}
-      </ul>
+
+      {tieneBloqueTuyo && (
+        <>
+          <div className="mt-1 text-[10px] uppercase tracking-widest text-zinc-500">
+            Lo tuyo
+          </div>
+          <ul className="space-y-1 leading-tight">
+            {misAtaques.map((h, i) => (
+              <li key={`a${i}`} className="battleship-fade-in text-emerald-200" style={fadeStyle()}>
+                🎯 Le pegaste a <strong>{h.victimaNombre}</strong> en {coordLabel(h.fila, h.col)}
+                {h.hundeBarco && " — ¡y le hundiste un barco!"}
+              </li>
+            ))}
+            {evento.fails.length > 0 && (
+              <li className="battleship-fade-in text-zinc-500" style={fadeStyle()}>
+                🌊 {evento.fails.length} disparo(s) tuyos al agua
+              </li>
+            )}
+            {misDesperdicios > 0 && (
+              <li className="battleship-fade-in text-amber-400/80" style={fadeStyle()}>
+                🚫 {misDesperdicios} disparo(s) a celda(s) ya impactada(s) — desperdicio
+              </li>
+            )}
+            {golpesRecibidos.map((h, i) => (
+              <li key={`r${i}`} className="battleship-fade-in text-red-300" style={fadeStyle()}>
+                💥 <strong>{h.atacanteNombre}</strong> te impactó en {coordLabel(h.fila, h.col)}
+                {h.hundeBarco && " — y hundió uno de tus barcos"}
+              </li>
+            ))}
+            {misHerencias.map((h, i) => (
+              <li key={`h${i}`} className="battleship-fade-in text-fuchsia-300" style={fadeStyle()}>
+                🧠 Heredaste la info de <strong>{h.victimaNombre}</strong>
+                {h.celdasGanadas > 0 && ` (+${h.celdasGanadas} celda(s) nueva(s))`}
+              </li>
+            ))}
+            {fuiEliminadoEstaRonda && (
+              <li className="battleship-fade-in font-semibold text-red-300" style={fadeStyle()}>
+                🪦 Fuiste eliminado.
+              </li>
+            )}
+          </ul>
+        </>
+      )}
+
+      {(hitsPublicos.length > 0 || otrosEliminados.length > 0) && (
+        <>
+          <div className="mt-2 text-[10px] uppercase tracking-widest text-zinc-500">
+            Otros enfrentamientos
+          </div>
+          <ul className="space-y-1 leading-tight">
+            {hitsPublicos.map((h, i) => (
+              <li key={`p${i}`} className="battleship-fade-in text-zinc-300" style={fadeStyle()}>
+                ⚔️ <strong>{h.atacanteNombre}</strong> le pegó a{" "}
+                <strong>{h.victimaNombre}</strong>
+                {h.hundeBarco && " — ¡y le hundió un barco!"}
+              </li>
+            ))}
+            {otrosEliminados.length > 0 && (
+              <li className="battleship-fade-in text-amber-300" style={fadeStyle()}>
+                💀 Eliminados: {otrosEliminadosNombres}
+              </li>
+            )}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

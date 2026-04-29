@@ -18,8 +18,12 @@ export type RondaResumen = {
   ronda: number;
   hits: EventoHit[];
   fails: { atacante: string }[];
+  desperdicios?: { atacante: string }[];
   eliminados: string[];
   hitsPublicos?: EventoHitPublico[];
+  totalHits?: number;
+  totalFails?: number;
+  totalDesperdicios?: number;
 };
 
 type Props = {
@@ -28,15 +32,23 @@ type Props = {
   // Si true, se considera que el viewer ve todo (líder/espectador). Sirve para
   // saber si hay que combinar `hits` con `hitsPublicos` o no.
   veTodo: boolean;
+  etiqueta?: string; // Texto pequeño arriba (ej. "Resultado" o "Resultados ronda anterior")
 };
 
-export default function BannerRevelado({ evento, jugadores, veTodo }: Props) {
-  // Hits totales (cualquier viewer ve los suyos en `hits`. veTodo=true ya tiene
-  // todos. veTodo=false suma hitsPublicos).
+export default function BannerRevelado({
+  evento,
+  jugadores,
+  veTodo,
+  etiqueta = "Resultado",
+}: Props) {
+  // Hits/fails: si el server envió totales globales, los usamos. Sino caemos a
+  // los del propio jugador (compatibilidad).
   const hitsBase = evento.hits ?? [];
   const hitsExtra = veTodo ? [] : (evento.hitsPublicos ?? []);
-  const totalHits = hitsBase.length + hitsExtra.length;
-  const totalFails = (evento.fails ?? []).length;
+  const totalHits = evento.totalHits ?? hitsBase.length + hitsExtra.length;
+  const totalFails = evento.totalFails ?? (evento.fails ?? []).length;
+  const totalDesperdicios =
+    evento.totalDesperdicios ?? (evento.desperdicios ?? []).length;
 
   const hundimientosCount =
     hitsBase.filter((h) => h.hundeBarco).length +
@@ -56,13 +68,17 @@ export default function BannerRevelado({ evento, jugadores, veTodo }: Props) {
       .map((h) => ({ atacante: h.atacanteNombre, victima: h.victimaNombre })),
   ];
 
-  const sinNada = totalHits === 0 && totalFails === 0 && eliminadosNombres.length === 0;
+  const sinNada =
+    totalHits === 0 &&
+    totalFails === 0 &&
+    totalDesperdicios === 0 &&
+    eliminadosNombres.length === 0;
 
   return (
-    <div className="rounded-2xl border-2 border-fuchsia-600 bg-gradient-to-br from-fuchsia-950/80 via-fuchsia-900/40 to-fuchsia-950/60 p-5 shadow-lg shadow-fuchsia-900/30">
+    <div className="rounded-2xl border-2 border-fuchsia-600 bg-gradient-to-br from-fuchsia-950/80 via-fuchsia-900/40 to-fuchsia-950/60 p-4 shadow-lg shadow-fuchsia-900/30">
       <div className="text-center">
         <div className="text-[11px] uppercase tracking-widest text-fuchsia-300 opacity-80">
-          Resultado
+          {etiqueta}
         </div>
         <div className="mt-0.5 text-2xl font-extrabold uppercase tracking-wide text-fuchsia-100 sm:text-3xl">
           Ronda {evento.ronda}
@@ -70,21 +86,33 @@ export default function BannerRevelado({ evento, jugadores, veTodo }: Props) {
       </div>
 
       {/* Stats grandes */}
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm">
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
         <Stat icono="💥" label="impactos" valor={totalHits} color="text-red-200" />
         <Stat icono="🌊" label="al agua" valor={totalFails} color="text-sky-200" />
-        <Stat
-          icono="🔥"
-          label={hundimientosCount === 1 ? "hundido" : "hundidos"}
-          valor={hundimientosCount}
-          color="text-amber-200"
-        />
-        <Stat
-          icono="🪦"
-          label={eliminadosNombres.length === 1 ? "eliminado" : "eliminados"}
-          valor={eliminadosNombres.length}
-          color="text-rose-200"
-        />
+        {totalDesperdicios > 0 && (
+          <Stat
+            icono="🚫"
+            label={totalDesperdicios === 1 ? "desperdicio" : "desperdicios"}
+            valor={totalDesperdicios}
+            color="text-zinc-300"
+          />
+        )}
+        {hundimientosCount > 0 && (
+          <Stat
+            icono="🔥"
+            label={hundimientosCount === 1 ? "hundido" : "hundidos"}
+            valor={hundimientosCount}
+            color="text-amber-200"
+          />
+        )}
+        {eliminadosNombres.length > 0 && (
+          <Stat
+            icono="🪦"
+            label={eliminadosNombres.length === 1 ? "eliminado" : "eliminados"}
+            valor={eliminadosNombres.length}
+            color="text-rose-200"
+          />
+        )}
       </div>
 
       {/* Highlights destacados */}
