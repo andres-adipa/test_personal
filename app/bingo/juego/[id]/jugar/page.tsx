@@ -88,7 +88,10 @@ export default function JugarPage({ params }: { params: Promise<{ id: string }> 
   useEffect(() => {
     if (!cargado || !miEmail) return;
     refetch();
-    const t = setInterval(refetch, 1000);
+    // 2.5s en lugar de 1s: con 45+ jugadores reduce GETs de ~45/s a ~18/s,
+    // alivia carga sobre Postgres y Cloud Run sin que la UX se sienta lenta
+    // (las acciones del propio jugador hacen refetch inmediato).
+    const t = setInterval(refetch, 2500);
     return () => clearInterval(t);
   }, [cargado, miEmail, refetch]);
 

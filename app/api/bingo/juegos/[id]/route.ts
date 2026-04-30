@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJuego } from "@/lib/store";
+import { getJuego, listarMarcasJuego } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const email = (req.nextUrl.searchParams.get("email") ?? "").toLowerCase();
-  const j = await getJuego(id);
+  // Las marcas viven en su propia tabla (ver lib/store.ts). Consultamos en
+  // paralelo con el juego para no agregar latencia al GET.
+  const [j, marcas] = await Promise.all([getJuego(id), listarMarcasJuego(id)]);
   if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
 
   const esLider = !!email && email === j.lider;
@@ -16,8 +18,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     : j.cartones.filter((c) => c.ofrecidoA === email || c.jugadorEmail === email);
 
   const marcasVisibles = esLider
-    ? j.marcas
-    : j.marcas.filter((m) => {
+    ? marcas
+    : marcas.filter((m) => {
         const carton = j.cartones.find((c) => c.id === m.cartonId);
         return carton?.jugadorEmail === email;
       });

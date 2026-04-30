@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJuego, setJuego } from "@/lib/store";
+import { db } from "@/lib/db";
+import { agregarMarca, quitarMarca } from "@/lib/store";
+import type { Juego } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+// Marcar es la operación de mayor frecuencia (cada jugador marca ~15 números
+// por partida, casi en sincronía cuando el líder canta). Antes hacíamos
+// read-modify-write sobre la fila JSONB del juego, lo que serializaba todas
+// las marcas y reventaba a 45+ jugadores. Ahora insertamos/borramos una sola
+// fila en bingo_marcas y validamos lo mínimo (cartón pertenece al jugador y
+// número está en el cartón) leyendo solo lo necesario del JSONB.
+type CartonLite = Pick<Juego["cartones"][number], "id" | "jugadorEmail" | "elegido" | "numeros">;
+type ValidacionRow = { lider: string; carton: CartonLite | null };
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,25 +22,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const numero = Number(body.numero);
   const desmarcar = !!body.desmarcar;
 
-  const j = await getJuego(id);
-  if (!j) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
+  // Validar con una sola query: extrae el cartón puntual desde el JSONB.
+  const rows = await db<ValidacionRow[]>`
+    SELECT
+      lider,
+      (
+        SELECT to_jsonb(c)
+          FROM jsonb_array_elements(data->'cartones') AS c
+         WHERE c->>'id' = ${cartonId}
+         LIMIT 1
+      ) AS carton
+    FROM bingo_juegos
+    WHERE id = ${id}
+    LIMIT 1
+  `;
+  const fila = rows[0];
+  if (!fila) return NextResponse.json({ error: "Juego no existe" }, { status: 404 });
 
-  const carton = j.cartones.find((c) => c.id === cartonId);
+  const carton = fila.carton;
   if (!carton || carton.jugadorEmail !== email || !carton.elegido) {
     return NextResponse.json({ error: "Cartón no válido" }, { status: 400 });
   }
-  // El número debe estar realmente en el cartón.
-  const existeEnCarton = carton.numeros.some((fila) => fila.some((n) => n === numero));
+  const existeEnCarton = carton.numeros.some((f) => f.some((n) => n === numero));
   if (!existeEnCarton) {
     return NextResponse.json({ error: "Ese número no está en tu cartón" }, { status: 400 });
   }
 
   if (desmarcar) {
-    j.marcas = j.marcas.filter((m) => !(m.cartonId === cartonId && m.numero === numero));
+    await quitarMarca(id, cartonId, numero);
   } else {
-    const ya = j.marcas.find((m) => m.cartonId === cartonId && m.numero === numero);
-    if (!ya) j.marcas.push({ cartonId, numero, marcadoAt: Date.now() });
+    await agregarMarca(id, cartonId, numero, email);
   }
-  await setJuego(j);
   return NextResponse.json({ ok: true });
 }

@@ -1,8 +1,12 @@
-// Store de Bingo persistido en Postgres (Supabase). Tabla `bingo_juegos`.
-// El objeto Juego completo se serializa en la columna `data` (JSONB).
+// Store de Bingo persistido en Postgres (Supabase).
+// - `bingo_juegos`: objeto Juego completo serializado en columna `data` (JSONB).
+// - `bingo_marcas`: filas independientes (juego_id, carton_id, numero, email,
+//   marcado_at). Se separó del JSONB para evitar contención de row lock cuando
+//   muchos jugadores marcan a la vez (a 45+ jugadores el read-modify-write
+//   sobre la misma fila JSONB serializaba todo y saturaba al servidor).
 
 import { db } from "@/lib/db";
-import type { Juego } from "./types";
+import type { Juego, Marca } from "./types";
 
 type Row = { data: Juego | string };
 
@@ -47,6 +51,62 @@ export async function listarJuegos(): Promise<Juego[]> {
 
 export function nuevoId(prefix = ""): string {
   return prefix + Math.random().toString(36).slice(2, 10);
+}
+
+// === Marcas (tabla aparte) ===
+// Una fila por (juego_id, carton_id, numero). UPSERT y DELETE puntuales: cada
+// marca toca una fila distinta, así 45 jugadores marcando a la vez no se
+// pelean por el mismo lock.
+
+type MarcaRow = {
+  juego_id: string;
+  carton_id: string;
+  numero: number;
+  email: string;
+  marcado_at: Date;
+};
+
+export async function listarMarcasJuego(juegoId: string): Promise<Marca[]> {
+  const rows = await db<MarcaRow[]>`
+    SELECT juego_id, carton_id, numero, email, marcado_at
+      FROM bingo_marcas
+     WHERE juego_id = ${juegoId}
+  `;
+  return rows.map((r) => ({
+    cartonId: r.carton_id,
+    numero: r.numero,
+    marcadoAt: new Date(r.marcado_at).getTime(),
+  }));
+}
+
+export async function agregarMarca(
+  juegoId: string,
+  cartonId: string,
+  numero: number,
+  email: string,
+): Promise<void> {
+  await db`
+    INSERT INTO bingo_marcas (juego_id, carton_id, numero, email)
+    VALUES (${juegoId}, ${cartonId}, ${numero}, ${email})
+    ON CONFLICT (juego_id, carton_id, numero) DO NOTHING
+  `;
+}
+
+export async function quitarMarca(
+  juegoId: string,
+  cartonId: string,
+  numero: number,
+): Promise<void> {
+  await db`
+    DELETE FROM bingo_marcas
+     WHERE juego_id = ${juegoId}
+       AND carton_id = ${cartonId}
+       AND numero = ${numero}
+  `;
+}
+
+export async function limpiarMarcasJuego(juegoId: string): Promise<void> {
+  await db`DELETE FROM bingo_marcas WHERE juego_id = ${juegoId}`;
 }
 
 export function barajar90(): number[] {

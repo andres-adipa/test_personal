@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getJuego, setJuego, barajar90 } from "@/lib/store";
+import { getJuego, setJuego, barajar90, limpiarMarcasJuego } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +24,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   j.startedAt = null;
   j.endedAt = null;
   // Los jugadores se mantienen pero sus cartones se borran → deben re-elegir.
-  await setJuego(j);
+  await Promise.all([setJuego(j), limpiarMarcasJuego(id)]);
   return NextResponse.json({ ok: true });
 }
